@@ -48,6 +48,7 @@ En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En 
 
 ## Despliegue (primera vez)
 
+0. **Dominio:** Worker → Settings → Domains & Routes → Custom domain `cdnutricion.diwilo.com`.
 1. **Crear recursos**
    ```bash
    npx wrangler d1 create cdnutricion          # copia el database_id a wrangler.jsonc
@@ -55,7 +56,7 @@ En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En 
    npm run db:migrate:remote
    ```
 2. **Cloudflare Access** (Zero Trust → Access → Applications → Self-hosted)
-   - Dominio del Worker, rutas `/admin` y `/api/admin`.
+   - Dominio `cdnutricion.diwilo.com`, rutas `/admin` y `/api/admin`.
    - Política *Allow* por correo o dominio (método: código por correo o SSO).
    - Copia el **Application Audience (AUD) Tag**.
 3. **Secretos**

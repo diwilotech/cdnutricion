@@ -6,6 +6,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
+  // Solo se publica en el dominio propio (cdnutricion.diwilo.com), que es el que protege Access.
+  "workers_dev": false,
+  "preview_urls": false,
+
   // Frontend: HTML sueltas servidas por el mismo Worker.
   // /api/* y /admin/* pasan primero por el Worker (auth + tenant).
   "assets": {
