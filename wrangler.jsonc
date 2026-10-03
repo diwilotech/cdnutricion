@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "cdnutricion",
-      "database_id": "REEMPLAZAR_CON_ID_DE_D1",
+      "database_id": "3dc82375-5088-44c0-920c-f0aea7ddc503",
       "migrations_dir": "migrations"
     }
   ],
