@@ -54,7 +54,7 @@
               <div class="col-sm-3"><select name="role" class="form-select">
                 <option value="staff">Equipo</option><option value="admin">Administrador</option><option value="owner">Propietario</option></select></div>
             </div>
-            <div class="form-text mb-2">El correo también debe estar permitido en la política de Cloudflare Access.</div>
+            <div class="form-text mb-2">Si la persona aún no tiene cuenta, se genera un link para que cree su contraseña.</div>
             <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Agregar</button>
           </form>
         </div>
@@ -115,14 +115,14 @@
             <span class="avatar">${esc((u.name || u.email)[0].toUpperCase())}</span>
             <div class="flex-grow-1 text-truncate">
               <div class="fw-medium text-truncate">${esc(u.name || u.email)}</div>
-              <div class="small text-body-secondary text-truncate">${esc(u.email)}${u.has_pin ? '' : ' · <em>sin PIN aún</em>'}</div>
+              <div class="small text-body-secondary text-truncate">${esc(u.email)}${u.has_password ? '' : ' · <em>invitación pendiente</em>'}</div>
             </div>
             <span class="badge text-bg-light">${App.ROLE[u.role]}</span>
             ${canManage && u.id !== me.userId ? `
               <div class="dropdown">
                 <button class="btn btn-sm btn-link text-body-secondary" data-bs-toggle="dropdown" aria-label="Opciones"><i class="bi bi-three-dots-vertical"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                  <li><button class="dropdown-item" data-reset="${esc(u.id)}"><i class="bi bi-key me-2"></i>Restablecer PIN</button></li>
+                  <li><button class="dropdown-item" data-reset="${esc(u.id)}"><i class="bi bi-link-45deg me-2"></i>Link para crear contraseña</button></li>
                   <li><button class="dropdown-item text-danger" data-remove="${esc(u.id)}"><i class="bi bi-person-dash me-2"></i>Quitar del equipo</button></li>
                 </ul>
               </div>` : ''}
@@ -136,9 +136,10 @@
       });
 
       App.onSubmit($('teamForm'), async (d) => {
-        await App.api('/team', { method: 'POST', body: d });
+        const r = await App.api('/team', { method: 'POST', body: d });
         $('teamForm').reset();
         App.toast('Miembro agregado');
+        if (r.inviteUrl) App.inviteDialog(r.inviteUrl, 'Invitación al equipo');
         loadTeam();
       });
 
@@ -147,9 +148,9 @@
         if (!b) return;
         try {
           if (b.dataset.reset) {
-            if (!(await App.confirmAction('Esta persona deberá crear un PIN nuevo en su próximo ingreso. ¿Continuar?'))) return;
-            await App.api(`/team/${b.dataset.reset}/reset-pin`, { method: 'POST' });
-            App.toast('PIN restablecido');
+            const r = await App.api(`/team/${b.dataset.reset}/invite`, { method: 'POST' });
+            App.inviteDialog(r.inviteUrl);
+            return;
           } else {
             if (!(await App.confirmAction('¿Quitar a esta persona del equipo?'))) return;
             await App.api(`/team/${b.dataset.remove}`, { method: 'DELETE' });

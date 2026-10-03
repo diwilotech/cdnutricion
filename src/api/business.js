@@ -3,6 +3,7 @@ import { json, readJson, HttpError, str, oneOf, email } from '../lib/http.js';
 import { tenantDb, globalDb, uuid } from '../lib/db.js';
 import { sendWhatsApp } from '../integrations/whatsapp.js';
 import { sendMail } from '../integrations/email.js';
+import { createInvite, invitePath } from '../lib/auth.js';
 
 const ROLES = ['owner', 'admin', 'staff'];
 
@@ -50,7 +51,7 @@ export function routes(r) {
 
   r.get('/api/admin/team', 'tenant', async (c) => {
     const items = await tenantDb(c).all(
-      `SELECT u.id, u.email, u.name, m.role, m.created_at, (u.pin_hash IS NOT NULL) AS has_pin
+      `SELECT u.id, u.email, u.name, m.role, m.created_at, (u.pin_hash IS NOT NULL) AS has_password
          FROM memberships m JOIN users u ON u.id = m.user_id
         WHERE m.business_id = ? ORDER BY m.role, u.email`,
       c.businessId,
@@ -65,7 +66,7 @@ export function routes(r) {
     if (role === 'owner' && c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede asignar propietarios');
     const name = str(body.name, { max: 100, label: 'Nombre' });
     const gdb = globalDb(c.env);
-    let user = await gdb.first('SELECT id FROM users WHERE email = ?', mail);
+    let user = await gdb.first('SELECT id, pin_hash FROM users WHERE email = ?', mail);
     if (!user) {
       user = { id: uuid() };
       await gdb.run('INSERT INTO users (id, email, name) VALUES (?, ?, ?)', user.id, mail, name);
@@ -75,7 +76,9 @@ export function routes(r) {
        ON CONFLICT (user_id, business_id) DO UPDATE SET role = excluded.role`,
       user.id, c.businessId, role,
     );
-    return json({ ok: true, userId: user.id }, 201);
+    // Quien aún no tiene contraseña recibe un link para crearla.
+    const inviteUrl = user.pin_hash ? null : c.url.origin + invitePath(await createInvite(c.env, user.id));
+    return json({ ok: true, userId: user.id, inviteUrl }, 201);
   });
 
   r.delete('/api/admin/team/:userId', 'manager', async (c) => {
@@ -91,24 +94,12 @@ export function routes(r) {
     return json({ ok: true });
   });
 
-  // Borra el PIN de un miembro: lo definirá de nuevo en su próximo ingreso.
-  r.post('/api/admin/team/:userId/reset-pin', 'manager', async (c) => {
-    const db = tenantDb(c);
-    const m = await db.first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId);
+  // Link para que un miembro cree (o restablezca) su contraseña.
+  r.post('/api/admin/team/:userId/invite', 'manager', async (c) => {
+    const m = await tenantDb(c).first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId);
     if (!m) throw new HttpError(404, 'Miembro no encontrado');
     if (m.role === 'owner' && c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede hacer esto');
-    await db.batch([
-      db.prepare(
-        `UPDATE users SET pin_hash = NULL, pin_salt = NULL, failed_pins = 0, locked_until = NULL
-          WHERE id = (SELECT user_id FROM memberships WHERE business_id = ? AND user_id = ?)`,
-        c.businessId, c.params.userId,
-      ),
-      db.prepare(
-        'DELETE FROM sessions WHERE user_id = (SELECT user_id FROM memberships WHERE business_id = ? AND user_id = ?)',
-        c.businessId, c.params.userId,
-      ),
-    ]);
-    return json({ ok: true });
+    return json({ ok: true, inviteUrl: c.url.origin + invitePath(await createInvite(c.env, c.params.userId)) });
   });
 
   // ---------- pruebas de integraciones ----------

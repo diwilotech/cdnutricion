@@ -1,48 +1,64 @@
-import { json, readJson, HttpError } from '../lib/http.js';
+import { json, readJson, HttpError, str } from '../lib/http.js';
 import {
-  loadUser, loadSession, userBusinesses, checkPin, setPin,
-  createSession, sessionCookie, destroySession,
+  userByEmail, loadSession, userBusinesses, checkPassword, setPassword, isWeakPassword,
+  createSession, sessionCookie, destroySession, createInvite, userByInvite,
 } from '../lib/auth.js';
 import { globalDb } from '../lib/db.js';
 
+// Abre sesión y elige el negocio si solo tiene uno activo.
+async function startSession(c, user) {
+  const businesses = await userBusinesses(c.env, user);
+  const businessId = businesses.length === 1 ? businesses[0].id : null;
+  const token = await createSession(c.env, user, businessId);
+  return json({ ok: true, businessId, businesses }, 200, { 'set-cookie': sessionCookie(token, c.req) });
+}
+
 export function routes(r) {
-  // Estado de la identidad: lo usa login.html y el encabezado de cada página.
-  r.get('/api/admin/auth/me', 'access', async (c) => {
-    const user = c.user;
-    const session = await loadSession(c.req, c.env, c.email);
+  // Estado de la sesión: lo usa login.html y el encabezado de cada página.
+  r.get('/api/admin/auth/me', 'session', async (c) => {
+    const s = c.session;
     return json({
-      userId: user.id,
-      email: c.email,
-      name: user.name,
-      hasPin: !!user.pin_hash,
-      isSuperadmin: !!user.is_superadmin,
-      session: session
-        ? { businessId: session.business_id, businessName: session.business_name, role: session.role }
-        : null,
-      businesses: session ? await userBusinesses(c.env, user) : [],
+      userId: c.user.id,
+      email: c.user.email,
+      name: c.user.name,
+      session: {
+        businessId: s.business_id, businessName: s.business_name, role: s.role,
+        readOnly: s.read_only, paidUntil: s.paid_until || null,
+      },
+      businesses: await userBusinesses(c.env, c.user),
     });
   });
 
-  // Valida (o define por primera vez) el PIN y abre sesión.
-  r.post('/api/admin/auth/pin', 'access', async (c) => {
-    const { pin, name } = await readJson(c.req);
-    const user = c.user;
-    if (!user.pin_hash) {
-      await setPin(c.env, user.id, String(pin || ''));
-      if (name) await globalDb(c.env).run('UPDATE users SET name = ? WHERE id = ?', String(name).slice(0, 100), user.id);
-    } else {
-      if (!/^\d{4,8}$/.test(String(pin || ''))) throw new HttpError(400, 'PIN inválido');
-      await checkPin(c.env, user, String(pin));
+  r.post('/api/admin/auth/login', 'public', async (c) => {
+    const { email, password } = await readJson(c.req);
+    const user = await userByEmail(c.env, email);
+    await checkPassword(c.env, user, password);
+    // Credencial vieja (PIN): se acepta una vez y pide crear la contraseña.
+    if (isWeakPassword(password)) {
+      return json({ ok: true, mustSetPassword: true, invite: await createInvite(c.env, user.id) });
     }
-    const businesses = await userBusinesses(c.env, user);
-    const active = businesses.filter((b) => b.status === 'active');
-    const businessId = active.length === 1 ? active[0].id : null;
-    const token = await createSession(c.env, user, businessId);
-    return json(
-      { ok: true, businessId, businesses },
-      200,
-      { 'set-cookie': sessionCookie(token, c.req) },
-    );
+    return startSession(c, user);
+  });
+
+  // Link de invitación: crear (o restablecer) la contraseña.
+  r.get('/api/admin/auth/invite', 'public', async (c) => {
+    const user = await userByInvite(c.env, c.url.searchParams.get('token'));
+    if (!user) throw new HttpError(404, 'Este link ya no es válido. Pide uno nuevo.', 'BAD_INVITE');
+    return json({ email: user.email, name: user.name, reset: !!user.pin_hash });
+  });
+
+  r.post('/api/admin/auth/invite', 'public', async (c) => {
+    const body = await readJson(c.req);
+    const user = await userByInvite(c.env, body.token);
+    if (!user) throw new HttpError(404, 'Este link ya no es válido. Pide uno nuevo.', 'BAD_INVITE');
+    await setPassword(c.env, user.id, body.password);
+    const name = str(body.name, { max: 100, label: 'Nombre' });
+    const db = globalDb(c.env);
+    await db.batch([
+      db.prepare('UPDATE users SET name = COALESCE(?, name) WHERE id = ?', name, user.id),
+      db.prepare('DELETE FROM sessions WHERE user_id = ?', user.id),
+    ]);
+    return startSession(c, user);
   });
 
   // Cambia el negocio activo de la sesión.
@@ -55,11 +71,11 @@ export function routes(r) {
     return json({ ok: true, businessId: b.id, businessName: b.name });
   });
 
-  r.post('/api/admin/auth/change-pin', 'session', async (c) => {
-    const { currentPin, newPin } = await readJson(c.req);
-    const user = await loadUser(c.env, c.email);
-    await checkPin(c.env, user, String(currentPin || ''));
-    await setPin(c.env, user.id, String(newPin || ''));
+  r.post('/api/admin/auth/change-password', 'session', async (c) => {
+    const { currentPassword, newPassword } = await readJson(c.req);
+    const user = await userByEmail(c.env, c.user.email);
+    await checkPassword(c.env, user, currentPassword);
+    await setPassword(c.env, user.id, newPassword);
     return json({ ok: true });
   });
 

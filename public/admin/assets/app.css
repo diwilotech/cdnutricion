@@ -61,7 +61,6 @@ body { background: var(--cdn-bg); min-height: 100vh; }
 
 .appt-time { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 3.5rem; }
 
-.pin-input { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .login-card { max-width: 24rem; }
 
 #toasts { z-index: 1090; }

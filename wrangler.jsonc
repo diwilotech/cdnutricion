@@ -6,11 +6,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // Solo se publica en el dominio propio (cdnutricion.diwilo.com), que es el que protege Access.
+  // Solo se publica en el dominio propio (cdnutricion.diwilo.com).
+  // Diwilo Web llega por service binding, sin pasar por el dominio.
   "workers_dev": false,
   "preview_urls": false,
 
-  // Conserva las variables cargadas en el dashboard (ACCESS_*, SUPERADMIN_EMAILS…) en cada deploy.
+  // Conserva las variables cargadas en el dashboard en cada deploy.
   "keep_vars": true,
 
   // En Workers Builds (WORKERS_CI=1) aplica las migraciones de D1 pendientes antes de desplegar.
@@ -20,7 +21,7 @@
   },
 
   // Frontend: HTML sueltas servidas por el mismo Worker.
-  // /api/* y /admin/* pasan primero por el Worker (auth + tenant).
+  // /api/* y /admin/* pasan primero por el Worker (sesión + tenant).
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -48,9 +49,7 @@
   }
 
   // Secretos (wrangler secret put <NOMBRE>), no van en el repo:
-  //   ACCESS_TEAM_DOMAIN   p. ej. miequipo.cloudflareaccess.com
-  //   ACCESS_AUD           Application Audience (AUD) tag de la app de Access
-  //   SUPERADMIN_EMAILS    correos separados por coma con acceso total
+  //   PLATFORM_KEY         clave compartida con Diwilo Web (crea negocios y maneja suscripciones)
   //   SMTP_USER / SMTP_PASS  cuenta Gmail + contraseña de aplicación
   //   EVOLUTION_URL / EVOLUTION_KEY  servidor Evolution API
 }

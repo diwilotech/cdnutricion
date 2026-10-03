@@ -1,18 +1,18 @@
 // CD Nutrición — Worker monolítico: API + panel admin (HTML estáticos).
 import { Router } from './router.js';
 import { HttpError, errorResponse } from './lib/http.js';
-import { authenticate, accessEmail, loadSession } from './lib/auth.js';
+import { authenticate, loadSession } from './lib/auth.js';
 import * as authApi from './api/auth.js';
 import * as dashboardApi from './api/dashboard.js';
 import * as patientsApi from './api/patients.js';
 import * as appointmentsApi from './api/appointments.js';
 import * as filesApi from './api/files.js';
 import * as businessApi from './api/business.js';
-import * as superApi from './api/super.js';
+import * as platformApi from './api/platform.js';
 import * as cuerpoApi from './api/cuerpo.js';
 
 const router = new Router();
-for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, superApi, cuerpoApi]) {
+for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi]) {
   mod.routes(router);
 }
 
@@ -25,7 +25,8 @@ const SECURITY_HEADERS = {
 async function handleApi(req, env, ctx, url) {
   const { route, params } = router.match(req.method, url.pathname);
   // Protección CSRF: toda mutación debe traer este encabezado (fuerza preflight entre orígenes).
-  if (req.method !== 'GET' && req.headers.get('x-cdn') !== '1') {
+  // Diwilo Web (nivel 'platform') no usa cookies: se autentica con PLATFORM_KEY.
+  if (req.method !== 'GET' && route.auth !== 'platform' && req.headers.get('x-cdn') !== '1') {
     throw new HttpError(403, 'Solicitud no permitida');
   }
   const c = { req, env, ctx, url, params };
@@ -33,27 +34,13 @@ async function handleApi(req, env, ctx, url) {
   return route.handler(c);
 }
 
-// Páginas /admin/*: Access siempre; sin sesión (PIN) se redirige al login.
+// Páginas /admin/*: sin sesión se redirige al login (correo + contraseña).
 async function handleAdminPage(req, env, url) {
   const page = url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/admin';
-  const isPublicAsset = page === '/admin/login' || url.pathname.startsWith('/admin/assets/');
-
-  let email;
-  try {
-    email = await accessEmail(req, env);
-  } catch (e) {
-    if (isPublicAsset && url.pathname.startsWith('/admin/assets/')) return env.ASSETS.fetch(req);
-    throw e;
-  }
-  if (!isPublicAsset) {
-    const session = await loadSession(req, env, email);
-    if (!session) {
-      const next = encodeURIComponent(url.pathname + url.search);
-      return Response.redirect(`${url.origin}/admin/login?next=${next}`, 302);
-    }
-    if (page === '/admin/negocios' && !session.is_superadmin) {
-      return Response.redirect(`${url.origin}/admin/`, 302);
-    }
+  const isPublic = page === '/admin/login' || url.pathname.startsWith('/admin/assets/');
+  if (!isPublic && !(await loadSession(req, env))) {
+    const next = encodeURIComponent(url.pathname + url.search);
+    return Response.redirect(`${url.origin}/admin/login?next=${next}`, 302);
   }
   return env.ASSETS.fetch(req);
 }

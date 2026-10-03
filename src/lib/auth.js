@@ -1,17 +1,19 @@
-// Seguridad en dos capas:
-//   1. Cloudflare Access (SSO / código por correo) entrega la identidad (email)
-//      en un JWT firmado que verificamos aquí.
-//   2. PIN propio del usuario -> sesión en D1 referenciada por cookie HttpOnly.
+// Ingreso con correo + contraseña -> sesión en D1 referenciada por cookie HttpOnly.
 // La sesión también fija el negocio (tenant) activo.
+// Los negocios, sus propietarios y la suscripción los maneja Diwilo Web
+// (api/platform.js, nivel 'platform' con PLATFORM_KEY).
+// La contraseña vive en users.pin_hash/pin_salt (antes era un PIN; los PIN
+// viejos se aceptan una vez y obligan a crear la contraseña).
 
 import { HttpError, getCookie } from './http.js';
-import { globalDb, uuid, nowIso } from './db.js';
+import { globalDb, nowIso } from './db.js';
 
 export const SESSION_COOKIE = 'cdn_sid';
 const SESSION_HOURS = 12;
-const MAX_PIN_FAILS = 5;
+const MAX_FAILS = 5;
 const LOCK_MINUTES = 15;
 const PBKDF2_ITERATIONS = 100000;
+const MIN_PASSWORD = 8;
 
 const enc = new TextEncoder();
 
@@ -19,11 +21,6 @@ const enc = new TextEncoder();
 
 const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const fromHex = (hex) => new Uint8Array(hex.match(/../g).map((h) => parseInt(h, 16)));
-
-function b64urlDecode(s) {
-  const pad = s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
-  return Uint8Array.from(atob(pad), (ch) => ch.charCodeAt(0));
-}
 
 export async function sha256Hex(text) {
   return toHex(await crypto.subtle.digest('SHA-256', enc.encode(text)));
@@ -33,15 +30,15 @@ function randomHex(bytes) {
   return toHex(crypto.getRandomValues(new Uint8Array(bytes)));
 }
 
-function timingSafeEqualHex(a, b) {
+export function timingSafeEqualHex(a, b) {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
 
-export async function hashPin(pin, saltHex = randomHex(16)) {
-  const key = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits']);
+export async function hashPassword(password, saltHex = randomHex(16)) {
+  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: fromHex(saltHex), iterations: PBKDF2_ITERATIONS },
     key,
@@ -50,94 +47,14 @@ export async function hashPin(pin, saltHex = randomHex(16)) {
   return { hash: toHex(bits), salt: saltHex };
 }
 
-// ---------- Cloudflare Access ----------
-
-let certCache = { keys: null, at: 0 };
-
-async function accessKeys(env) {
-  if (certCache.keys && Date.now() - certCache.at < 60 * 60 * 1000) return certCache.keys;
-  const res = await fetch(`https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
-  if (!res.ok) throw new HttpError(503, 'No se pudo validar Cloudflare Access');
-  const { keys } = await res.json();
-  certCache = { keys, at: Date.now() };
-  return keys;
-}
-
-async function verifyAccessJwt(token, env) {
-  const parts = token.split('.');
-  if (parts.length !== 3) throw new HttpError(403, 'Token de Access inválido');
-  const [h, p, s] = parts;
-  const header = JSON.parse(new TextDecoder().decode(b64urlDecode(h)));
-  const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(p)));
-  if (header.alg !== 'RS256') throw new HttpError(403, 'Token de Access inválido');
-
-  const jwk = (await accessKeys(env)).find((k) => k.kid === header.kid);
-  if (!jwk) {
-    certCache = { keys: null, at: 0 }; // rotación de llaves: forzar recarga la próxima vez
-    throw new HttpError(403, 'Token de Access inválido');
-  }
-  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlDecode(s), enc.encode(`${h}.${p}`));
-  if (!ok) throw new HttpError(403, 'Firma de Access inválida');
-
-  const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!aud.includes(env.ACCESS_AUD)) throw new HttpError(403, 'Audiencia de Access inválida');
-  // La firma ya se validó con las llaves del equipo y el AUD es único por app.
-  // El emisor puede conservar el nombre anterior del equipo tras renombrarlo,
-  // así que solo exigimos que sea un dominio de Cloudflare Access.
-  if (!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(payload.iss || '')) {
-    throw new HttpError(403, `Emisor de Access inválido (${String(payload.iss).slice(0, 80)})`);
-  }
-  if (!payload.exp || payload.exp * 1000 < Date.now()) throw new HttpError(403, 'Sesión de Access expirada');
-  if (!payload.email) throw new HttpError(403, 'Access no entregó un correo');
-  return payload.email.toLowerCase();
-}
-
-// Devuelve el email autenticado por Access.
-// En local (sin ACCESS_AUD) usa DEV_EMAIL de .dev.vars.
-export async function accessEmail(req, env) {
-  if (env.ACCESS_AUD && env.ACCESS_TEAM_DOMAIN) {
-    const token = req.headers.get('cf-access-jwt-assertion') || getCookie(req, 'CF_Authorization');
-    if (!token) throw new HttpError(403, 'Se requiere Cloudflare Access', 'NO_ACCESS');
-    return verifyAccessJwt(token, env);
-  }
-  if (env.DEV_EMAIL) return env.DEV_EMAIL.toLowerCase();
-  throw new HttpError(503, 'Cloudflare Access no está configurado (ACCESS_TEAM_DOMAIN / ACCESS_AUD)');
-}
-
 // ---------- usuarios ----------
 
-function superadminList(env) {
-  return (env.SUPERADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-}
-
-// Busca el usuario por email. Si está en SUPERADMIN_EMAILS y no existe, lo crea.
-export async function loadUser(env, email) {
-  const db = globalDb(env);
-  let user = await db.first('SELECT * FROM users WHERE email = ?', email);
-  const isSuper = superadminList(env).includes(email);
-  if (!user && isSuper) {
-    await db.run('INSERT INTO users (id, email, is_superadmin) VALUES (?, ?, 1)', uuid(), email);
-    user = await db.first('SELECT * FROM users WHERE email = ?', email);
-  } else if (user && isSuper && !user.is_superadmin) {
-    await db.run('UPDATE users SET is_superadmin = 1 WHERE id = ?', user.id);
-    user.is_superadmin = 1;
-  }
-  if (!user) throw new HttpError(403, 'Tu correo no tiene acceso a ningún negocio', 'NO_USER');
-  return user;
+export async function userByEmail(env, email) {
+  return globalDb(env).first('SELECT * FROM users WHERE email = ?', String(email || '').trim().toLowerCase());
 }
 
 export async function userBusinesses(env, user) {
-  const db = globalDb(env);
-  if (user.is_superadmin) {
-    return db.all(
-      `SELECT b.id, b.name, b.status, COALESCE(m.role, 'owner') AS role
-         FROM businesses b LEFT JOIN memberships m ON m.business_id = b.id AND m.user_id = ?
-        ORDER BY b.name`,
-      user.id,
-    );
-  }
-  return db.all(
+  return globalDb(env).all(
     `SELECT b.id, b.name, b.status, m.role
        FROM memberships m JOIN businesses b ON b.id = m.business_id
       WHERE m.user_id = ? AND b.status = 'active'
@@ -146,31 +63,58 @@ export async function userBusinesses(env, user) {
   );
 }
 
-// ---------- PIN ----------
+// ---------- contraseña ----------
 
-export async function checkPin(env, user, pin) {
-  const db = globalDb(env);
+// Lanza 401/429 si no coincide. Mismo mensaje para correo inexistente o clave mala.
+export async function checkPassword(env, user, password) {
+  const bad = new HttpError(401, 'Correo o contraseña incorrectos', 'BAD_LOGIN');
+  if (!user || !user.pin_hash) {
+    await hashPassword(String(password || '')); // mismo costo que un intento real
+    throw bad;
+  }
   if (user.locked_until && user.locked_until > nowIso()) {
     throw new HttpError(429, 'Demasiados intentos. Intenta de nuevo en unos minutos.', 'LOCKED');
   }
-  const { hash } = await hashPin(pin, user.pin_salt);
+  const { hash } = await hashPassword(String(password || ''), user.pin_salt);
   if (timingSafeEqualHex(hash, user.pin_hash)) {
-    if (user.failed_pins) await db.run('UPDATE users SET failed_pins = 0, locked_until = NULL WHERE id = ?', user.id);
+    if (user.failed_pins) await globalDb(env).run('UPDATE users SET failed_pins = 0, locked_until = NULL WHERE id = ?', user.id);
     return;
   }
   const fails = (user.failed_pins || 0) + 1;
-  const lock = fails >= MAX_PIN_FAILS ? isoIn(LOCK_MINUTES * 60 * 1000) : null;
-  await db.run('UPDATE users SET failed_pins = ?, locked_until = ? WHERE id = ?', lock ? 0 : fails, lock, user.id);
-  throw new HttpError(401, lock ? 'PIN incorrecto. Cuenta bloqueada 15 minutos.' : 'PIN incorrecto', 'BAD_PIN');
+  const lock = fails >= MAX_FAILS ? isoIn(LOCK_MINUTES * 60 * 1000) : null;
+  await globalDb(env).run('UPDATE users SET failed_pins = ?, locked_until = ? WHERE id = ?', lock ? 0 : fails, lock, user.id);
+  if (lock) throw new HttpError(401, 'Contraseña incorrecta. Cuenta bloqueada 15 minutos.', 'BAD_LOGIN');
+  throw bad;
 }
 
-export async function setPin(env, userId, pin) {
-  if (!/^\d{4,8}$/.test(pin || '')) throw new HttpError(400, 'El PIN debe tener entre 4 y 8 dígitos');
-  const { hash, salt } = await hashPin(pin);
+export const isWeakPassword = (password) => String(password || '').length < MIN_PASSWORD;
+
+export async function setPassword(env, userId, password) {
+  if (isWeakPassword(password) || String(password).length > 200) {
+    throw new HttpError(400, `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
+  }
+  const { hash, salt } = await hashPassword(String(password));
   await globalDb(env).run(
-    'UPDATE users SET pin_hash = ?, pin_salt = ?, failed_pins = 0, locked_until = NULL WHERE id = ?',
+    'UPDATE users SET pin_hash = ?, pin_salt = ?, failed_pins = 0, locked_until = NULL, invite_hash = NULL WHERE id = ?',
     hash, salt, userId,
   );
+}
+
+// ---------- invitaciones ----------
+// Link /admin/login#invite=<token> para crear (o restablecer) la contraseña.
+// Se guarda solo el SHA-256; generar uno nuevo invalida el anterior.
+
+export const invitePath = (token) => `/admin/login#invite=${token}`;
+
+export async function createInvite(env, userId) {
+  const token = randomHex(32);
+  await globalDb(env).run('UPDATE users SET invite_hash = ? WHERE id = ?', await sha256Hex(token), userId);
+  return token;
+}
+
+export async function userByInvite(env, token) {
+  if (!/^[0-9a-f]{64}$/.test(String(token || ''))) return null;
+  return globalDb(env).first('SELECT * FROM users WHERE invite_hash = ?', await sha256Hex(token));
 }
 
 // ---------- sesiones ----------
@@ -193,13 +137,13 @@ export function sessionCookie(token, req) {
 }
 
 // Carga sesión + usuario + rol en el negocio activo en una sola consulta.
-export async function loadSession(req, env, email) {
+export async function loadSession(req, env) {
   const token = getCookie(req, SESSION_COOKIE);
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const row = await globalDb(env).first(
-    `SELECT s.id AS session_id, s.business_id, s.email AS session_email,
-            u.id AS user_id, u.email, u.name, u.is_superadmin,
-            m.role, b.name AS business_name, b.status AS business_status, b.timezone
+    `SELECT s.id AS session_id, s.business_id,
+            u.id AS user_id, u.email, u.name,
+            m.role, b.name AS business_name, b.status AS business_status, b.timezone, b.paid_until
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        LEFT JOIN memberships m ON m.user_id = u.id AND m.business_id = s.business_id
@@ -207,9 +151,8 @@ export async function loadSession(req, env, email) {
       WHERE s.id = ? AND s.expires_at > ?`,
     await sha256Hex(token), nowIso(),
   );
-  // La sesión queda atada al correo de Access con el que se creó.
-  if (!row || row.session_email !== email || row.email !== email) return null;
-  if (row.is_superadmin && row.business_id && !row.role) row.role = 'owner';
+  if (!row) return null;
+  row.read_only = isExpired(row.paid_until);
   return row;
 }
 
@@ -217,20 +160,34 @@ export async function destroySession(env, sessionId) {
   await globalDb(env).run('DELETE FROM sessions WHERE id = ?', sessionId);
 }
 
-// ---------- niveles de autorización por ruta ----------
-//   'access'  : identidad de Access + usuario registrado
-//   'session' : + PIN validado (sesión vigente)
-//   'tenant'  : + negocio activo con membresía
-//   'manager' : + rol owner/admin en el negocio
-//   'super'   : + superadministrador de la plataforma
+// ---------- suscripción ----------
+// businesses.paid_until ('YYYY-MM-DD', inclusive) lo fija Diwilo Web. NULL = sin límite.
+// Vencida -> solo lectura: toda escritura del negocio responde 402.
 
-// Paciente con enlace privado: no pasa por Access ni PIN; el token (256 bits) es la credencial.
+const todayBogota = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+export const isExpired = (paidUntil) => !!paidUntil && paidUntil < todayBogota();
+
+function assertWritable(c, paidUntil) {
+  if (c.req.method !== 'GET' && isExpired(paidUntil)) {
+    throw new HttpError(402, 'La suscripción del negocio está vencida: solo lectura.', 'READ_ONLY');
+  }
+}
+
+// ---------- niveles de autorización por ruta ----------
+//   'public'   : sin sesión (login, invitaciones)
+//   'session'  : sesión vigente (correo + contraseña)
+//   'tenant'   : + negocio activo con membresía
+//   'manager'  : + rol owner/admin en el negocio
+//   'portal'   : paciente con enlace privado
+//   'platform' : Diwilo Web (Authorization: Bearer PLATFORM_KEY)
+
+// Paciente con enlace privado: no pasa por login; el token (256 bits) es la credencial.
 async function authenticatePortal(c) {
   const token = c.req.headers.get('x-portal-token') || '';
   if (!/^[0-9a-f]{64}$/.test(token)) throw new HttpError(401, 'Enlace inválido', 'BAD_LINK');
   const id = await sha256Hex(token);
   const row = await globalDb(c.env).first(
-    `SELECT l.business_id, l.patient_id, b.timezone, b.status AS business_status, p.status AS patient_status
+    `SELECT l.business_id, l.patient_id, b.timezone, b.paid_until, b.status AS business_status, p.status AS patient_status
        FROM portal_links l
        JOIN businesses b ON b.id = l.business_id
        JOIN patients p ON p.id = l.patient_id AND p.business_id = l.business_id
@@ -239,31 +196,34 @@ async function authenticatePortal(c) {
   );
   if (!row) throw new HttpError(401, 'Este enlace ya no es válido. Pide uno nuevo a tu nutricionista.', 'BAD_LINK');
   if (row.business_status !== 'active' || row.patient_status !== 'active') throw new HttpError(403, 'Acceso no disponible');
+  assertWritable(c, row.paid_until);
   c.businessId = row.business_id;
   c.patientId = row.patient_id;
   c.timezone = row.timezone || 'America/Bogota';
   c.ctx?.waitUntil(globalDb(c.env).run(`UPDATE portal_links SET last_used_at = datetime('now') WHERE id = ?`, id));
 }
 
-export async function authenticate(c, level) {
-  if (level === 'portal') return authenticatePortal(c);
-  c.email = await accessEmail(c.req, c.env);
-  if (level === 'access') {
-    c.user = await loadUser(c.env, c.email);
-    return;
+async function authenticatePlatform(c) {
+  const key = c.env.PLATFORM_KEY;
+  const auth = c.req.headers.get('authorization') || '';
+  if (!key || !timingSafeEqualHex(await sha256Hex(auth), await sha256Hex(`Bearer ${key}`))) {
+    throw new HttpError(401, 'No autorizado');
   }
-  const s = await loadSession(c.req, c.env, c.email);
-  if (!s) throw new HttpError(401, 'Ingresa tu PIN', 'NO_SESSION');
+}
+
+export async function authenticate(c, level) {
+  if (level === 'public') return;
+  if (level === 'portal') return authenticatePortal(c);
+  if (level === 'platform') return authenticatePlatform(c);
+  const s = await loadSession(c.req, c.env);
+  if (!s) throw new HttpError(401, 'Inicia sesión', 'NO_SESSION');
   c.session = s;
-  c.user = { id: s.user_id, email: s.email, name: s.name, is_superadmin: !!s.is_superadmin };
+  c.user = { id: s.user_id, email: s.email, name: s.name };
 
   if (level === 'session') return;
-  if (level === 'super') {
-    if (!s.is_superadmin) throw new HttpError(403, 'Solo superadministradores');
-    return;
-  }
   if (!s.business_id || !s.role) throw new HttpError(409, 'Selecciona un negocio', 'NO_BUSINESS');
-  if (s.business_status !== 'active' && !s.is_superadmin) throw new HttpError(403, 'Negocio suspendido');
+  if (s.business_status !== 'active') throw new HttpError(403, 'Negocio suspendido');
+  assertWritable(c, s.paid_until);
   c.businessId = s.business_id;
   c.role = s.role;
   c.timezone = s.timezone || 'America/Bogota';

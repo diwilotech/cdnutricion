@@ -171,9 +171,6 @@ const App = (() => {
       ([key, href, icon, label]) =>
         `<li class="nav-item"><a class="nav-link ${key === active ? 'active' : ''}" href="${href}"><i class="bi ${icon} me-1"></i>${label}</a></li>`,
     ).join('');
-    const superLink = me.isSuperadmin
-      ? `<li class="nav-item"><a class="nav-link ${active === 'negocios' ? 'active' : ''}" href="/admin/negocios"><i class="bi bi-buildings me-1"></i>Negocios</a></li>`
-      : '';
     const switcher =
       me.businesses.length > 1
         ? `<li><h6 class="dropdown-header">Cambiar de negocio</h6></li>` +
@@ -195,7 +192,7 @@ const App = (() => {
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
-          <ul class="navbar-nav me-auto">${s.businessId ? links : ''}${superLink}</ul>
+          <ul class="navbar-nav me-auto">${s.businessId ? links : ''}</ul>
           <ul class="navbar-nav">
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">
@@ -204,8 +201,8 @@ const App = (() => {
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
                 ${switcher}
-                <li><span class="dropdown-item-text small text-body-secondary">${esc(me.email)}<br>${esc(ROLE[s.role] || (me.isSuperadmin ? 'Superadmin' : ''))}</span></li>
-                <li><button class="dropdown-item" data-action="change-pin"><i class="bi bi-key me-2"></i>Cambiar PIN</button></li>
+                <li><span class="dropdown-item-text small text-body-secondary">${esc(me.email)}<br>${esc(ROLE[s.role] || '')}</span></li>
+                <li><button class="dropdown-item" data-action="change-password"><i class="bi bi-key me-2"></i>Cambiar contraseña</button></li>
                 <li><button class="dropdown-item" data-action="logout"><i class="bi bi-box-arrow-right me-2"></i>Salir</button></li>
               </ul>
             </li>
@@ -213,6 +210,12 @@ const App = (() => {
         </div>
       </div>`;
     document.body.prepend(nav);
+    if (s.readOnly) {
+      const bar = document.createElement('div');
+      bar.className = 'alert alert-danger rounded-0 border-0 text-center small fw-semibold py-2 mb-0';
+      bar.innerHTML = '<i class="bi bi-lock-fill me-1"></i>La suscripción del consultorio está vencida: puedes consultar, pero no guardar cambios.';
+      nav.after(bar);
+    }
 
     nav.addEventListener('click', async (ev) => {
       const b = ev.target.closest('[data-business]');
@@ -227,8 +230,8 @@ const App = (() => {
       if (a?.dataset.action === 'logout') {
         await api('/auth/logout', { method: 'POST' }).catch(() => {});
         location.href = '/admin/login';
-      } else if (a?.dataset.action === 'change-pin') {
-        changePinDialog();
+      } else if (a?.dataset.action === 'change-password') {
+        changePasswordDialog();
       }
     });
   }
@@ -245,30 +248,46 @@ const App = (() => {
     return { el: wrap, hide: () => m.hide() };
   }
 
-  function changePinDialog() {
+  function changePasswordDialog() {
     const { el, hide } = modal(`
-      <form id="pinForm" novalidate>
-        <div class="modal-header"><h5 class="modal-title">Cambiar PIN</h5>
+      <form id="passwordForm" novalidate>
+        <div class="modal-header"><h5 class="modal-title">Cambiar contraseña</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
         <div class="modal-body">
-          <label class="form-label">PIN actual</label>
-          <input name="currentPin" type="password" inputmode="numeric" pattern="\\d{4,8}" class="form-control mb-3" required autocomplete="current-password">
-          <label class="form-label">PIN nuevo (4 a 8 dígitos)</label>
-          <input name="newPin" type="password" inputmode="numeric" pattern="\\d{4,8}" class="form-control" required autocomplete="new-password">
+          <input type="email" class="d-none" value="${esc(me.email)}" autocomplete="username">
+          <label class="form-label">Contraseña actual</label>
+          <input name="currentPassword" type="password" class="form-control mb-3" required autocomplete="current-password">
+          <label class="form-label">Contraseña nueva (mínimo 8 caracteres)</label>
+          <input name="newPassword" type="password" minlength="8" class="form-control" required autocomplete="new-password">
         </div>
         <div class="modal-footer"><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
     onSubmit(el.querySelector('form'), async (d) => {
-      await api('/auth/change-pin', { method: 'POST', body: d });
+      await api('/auth/change-password', { method: 'POST', body: d });
       hide();
-      toast('PIN actualizado');
+      toast('Contraseña actualizada');
+    });
+  }
+
+  // Muestra un link de invitación para copiarlo y enviarlo.
+  function inviteDialog(url, title = 'Link de acceso') {
+    const { el } = modal(`
+      <div class="modal-header"><h5 class="modal-title">${esc(title)}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+      <div class="modal-body">
+        <p class="small text-body-secondary">Envíale este link a la persona. Al abrirlo crea su contraseña y entra. Sirve una sola vez.</p>
+        <div class="input-group"><input class="form-control" readonly value="${esc(url)}">
+          <button class="btn btn-outline-primary" type="button" data-copy><i class="bi bi-copy"></i></button></div>
+      </div>`);
+    el.querySelector('[data-copy]').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(url); toast('Link copiado'); } catch { el.querySelector('input').select(); }
     });
   }
 
   function businessPicker() {
     const main = document.querySelector('main');
     const list = me.businesses
-      .filter((b) => b.status === 'active' || me.isSuperadmin)
+      .filter((b) => b.status === 'active')
       .map(
         (b) => `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-business="${esc(b.id)}">
           <span><i class="bi bi-shop me-2"></i>${esc(b.name)}</span><span class="badge text-bg-light">${esc(ROLE[b.role] || '')}</span></button>`,
@@ -277,8 +296,7 @@ const App = (() => {
     main.innerHTML = `
       <div class="card mx-auto mt-4" style="max-width:32rem"><div class="card-body p-4">
         <h1 class="h5 mb-3">Elige un negocio</h1>
-        ${list ? `<div class="list-group">${list}</div>` : `<p class="text-body-secondary mb-3">Aún no hay negocios registrados.</p>
-          ${me.isSuperadmin ? '<a class="btn btn-primary" href="/admin/negocios"><i class="bi bi-plus-lg me-1"></i>Crear el primero</a>' : ''}`}
+        ${list ? `<div class="list-group">${list}</div>` : '<p class="text-body-secondary mb-0">Tu correo no está asociado a ningún consultorio activo.</p>'}
       </div></div>`;
     main.addEventListener('click', async (ev) => {
       const b = ev.target.closest('[data-business]');
@@ -306,7 +324,7 @@ const App = (() => {
   }
 
   return {
-    api, init, toast, fail, esc, modal, onSubmit, formData, fillForm, confirmAction, param,
+    api, init, toast, fail, esc, modal, inviteDialog, onSubmit, formData, fillForm, confirmAction, param,
     fmtDate, fmtTime, fmtDateTime, fmtNum, fullName, initials, age, todayLocal, addDays,
     statusBadge, STATUS, KIND, ROLE,
     get me() { return me; },

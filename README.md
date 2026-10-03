@@ -9,17 +9,19 @@ App web multi-tenant para consultorios de nutrición: pacientes, consultas (antr
 - **Backend:** router propio mínimo ([src/router.js](src/router.js)), validaciones en el Worker.
 - **Datos:** D1 (SQLite), una sola base. Toda tabla de negocio lleva `business_id`; `tenantDb()` ([src/lib/db.js](src/lib/db.js)) rechaza SQL sin ese filtro y el valor sale siempre de la sesión.
 - **Archivos:** R2, clave `<business_id>/<patient_id>/<uuid>`.
-- **Seguridad:** Cloudflare Access (SSO / código por correo) → JWT verificado en el Worker → PIN propio (PBKDF2, bloqueo tras 5 fallos) → sesión en D1 con cookie HttpOnly. Las mutaciones exigen el encabezado `x-cdn: 1` (CSRF).
+- **Seguridad:** correo + contraseña (PBKDF2, bloqueo tras 5 fallos) → sesión en D1 con cookie HttpOnly. Las mutaciones exigen el encabezado `x-cdn: 1` (CSRF). Sin Cloudflare Access: el único panel protegido con Access es Diwilo Web.
+- **Plataforma:** los negocios, sus propietarios y la suscripción se manejan desde **Diwilo Web** (`diwilo.com/admin`), que llama a `/api/platform/*` con `Authorization: Bearer PLATFORM_KEY` ([src/api/platform.js](src/api/platform.js)).
+- **Suscripción:** `businesses.paid_until` (`YYYY-MM-DD`; vacío = sin límite). Si la fecha ya pasó, el consultorio queda en **solo lectura**: toda escritura responde 402 y el panel muestra un aviso rojo. Aplica también al portal del paciente.
 - **Integraciones:** WhatsApp vía Evolution API ([src/integrations/whatsapp.js](src/integrations/whatsapp.js)), correo vía SMTP de Gmail con sockets TCP ([src/integrations/email.js](src/integrations/email.js)).
 
 ```
 src/
   index.js            entrada: API, páginas /admin, errores
   router.js           router con niveles de auth por ruta
-  lib/                http, db (guardia de tenant), auth (Access + PIN + sesión), time
-  api/                auth, dashboard, patients (+consultas), appointments, files, business (+equipo), super
+  lib/                http, db (guardia de tenant), auth (contraseña + sesión + suscripción), time
+  api/                auth, dashboard, patients (+consultas), appointments, files, business (+equipo), platform (Diwilo)
   integrations/       whatsapp, email
-public/admin/         login, index (dashboard), pacientes, cuerpo (Cuerpo Vivo), paciente (ficha), citas, ajustes, negocios
+public/admin/         login, index (dashboard), pacientes, cuerpo (Cuerpo Vivo), paciente (ficha), citas, ajustes
 public/cv/            Cuerpo Vivo: CSS, HTML parcial y JS compartidos por la nutricionista y el paciente
 public/p/             portal del paciente (/p/#<token>)
 migrations/           esquema D1
@@ -37,28 +39,32 @@ Con **Enlace del paciente** se genera un enlace privado `/p/#<token>` (se guarda
 desactiva el anterior). El paciente ve su seguimiento sin usuario ni contraseña y puede marcar comidas, agua y metas.
 El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`.
 
-**Access debe proteger solo `/admin` y `/api/admin`**: `/p/`, `/cv/` y `/api/p/` son públicos (el token protege los datos).
+`/p/`, `/cv/` y `/api/p/` son públicos (el token protege los datos).
 
 ### Roles
 
 | Nivel | Quién | Puede |
 |---|---|---|
-| `super` | correos en `SUPERADMIN_EMAILS` | crear/suspender negocios, entrar a cualquiera |
 | `owner` | propietario del negocio | todo en su negocio, gestionar propietarios |
 | `admin` | administrador | ajustes, equipo, borrar pacientes |
 | `staff` | equipo | pacientes, consultas, citas, archivos |
+
+Crear consultorios e invitar propietarios se hace desde Diwilo Web. Dentro del consultorio, un propietario o
+administrador agrega a su equipo en **Ajustes → Equipo**: si la persona no tiene cuenta, se genera un link
+`/admin/login#invite=<token>` para que cree su contraseña. El mismo botón genera un link nuevo si alguien la olvida.
+Los PIN de antes siguen entrando una vez y piden crear la contraseña.
 
 ## Desarrollo local
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars        # pon tu correo en DEV_EMAIL y SUPERADMIN_EMAILS
+cp .dev.vars.example .dev.vars        # PLATFORM_KEY para probar /api/platform
 npm run db:migrate:local
 npm run db:seed:local                 # opcional: 2 negocios y 5 pacientes de ejemplo
 npm run dev                           # http://localhost:8787/admin/
 ```
 
-En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En producción, si `ACCESS_AUD` está definido, `DEV_EMAIL` se ignora.
+Para tener un usuario en local, crea un negocio con `curl -X POST localhost:8787/api/platform/businesses -H "authorization: Bearer <PLATFORM_KEY>" -d '{"name":"Prueba","owner_email":"tu@correo.com","paid_until":null}'` y abre el `invite_path` que devuelve.
 
 ## Despliegue (primera vez)
 
@@ -69,15 +75,11 @@ En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En 
    npx wrangler r2 bucket create cdnutricion-files
    npm run db:migrate:remote
    ```
-2. **Cloudflare Access** (Zero Trust → Access → Applications → Self-hosted)
-   - Dominio `cdnutricion.diwilo.com`, rutas `/admin` y `/api/admin`.
-   - Política *Allow* por correo o dominio (método: código por correo o SSO).
-   - Copia el **Application Audience (AUD) Tag**.
+2. **Sin Cloudflare Access:** si existía una aplicación de Access para `cdnutricion.diwilo.com`, bórrala
+   (Zero Trust → Access → Applications). El login ahora es propio.
 3. **Secretos**
    ```bash
-   npx wrangler secret put ACCESS_TEAM_DOMAIN   # miequipo.cloudflareaccess.com
-   npx wrangler secret put ACCESS_AUD
-   npx wrangler secret put SUPERADMIN_EMAILS
+   npx wrangler secret put PLATFORM_KEY         # el mismo valor que en Diwilo Web
    npx wrangler secret put SMTP_USER            # opcional: correo Gmail
    npx wrangler secret put SMTP_PASS            # opcional: contraseña de aplicación
    npx wrangler secret put EVOLUTION_URL        # opcional
@@ -86,4 +88,3 @@ En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En 
 4. **Migraciones:** en Workers Builds el paso `build` de `wrangler.jsonc` aplica las migraciones pendientes antes de desplegar.
 5. **Workers Builds:** en el dashboard del Worker → Settings → Builds → conectar `diwilotech/cdnutricion`, rama `main`, comando de despliegue `npm run deploy` (aplica migraciones y despliega). Cada push a `main` despliega.
 
-Al agregar un miembro al equipo, su correo también debe estar permitido en la política de Access.

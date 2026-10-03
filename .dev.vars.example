@@ -1,7 +1,6 @@
 # Copia este archivo como .dev.vars para desarrollo local.
-# Sin ACCESS_AUD, el Worker usa DEV_EMAIL como identidad (solo local).
-DEV_EMAIL=tu-correo@ejemplo.com
-SUPERADMIN_EMAILS=tu-correo@ejemplo.com
+# Clave con la que Diwilo Web llama a /api/platform/* (la misma en los dos proyectos).
+PLATFORM_KEY=cambia-esta-clave-larga
 # SMTP_USER=
 # SMTP_PASS=
 # EVOLUTION_URL=

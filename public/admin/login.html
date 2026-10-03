@@ -14,24 +14,31 @@
       <div class="text-center mb-4">
         <div class="avatar mx-auto mb-2" style="width:3rem;height:3rem;font-size:1.4rem"><i class="bi bi-heart-pulse"></i></div>
         <h1 class="h5 mb-1">CD Nutrición</h1>
-        <p class="text-body-secondary small mb-0" id="who">Verificando acceso…</p>
+        <p class="text-body-secondary small mb-0" id="who">Cargando…</p>
       </div>
 
-      <form id="pinForm" class="d-none" novalidate>
-        <div id="nameField" class="mb-3 d-none">
-          <label class="form-label" for="name">Tu nombre</label>
-          <input id="name" name="name" class="form-control" maxlength="100" autocomplete="name">
-        </div>
-        <label class="form-label" for="pin" id="pinLabel">PIN</label>
-        <input id="pin" name="pin" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8"
-               class="form-control pin-input mb-2" required autocomplete="current-password">
-        <div id="confirmField" class="d-none">
-          <label class="form-label" for="pin2">Confirma el PIN</label>
-          <input id="pin2" name="pin2" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8"
-                 class="form-control pin-input mb-2" autocomplete="new-password">
-        </div>
-        <div class="invalid-feedback d-block small mb-2" id="err"></div>
+      <!-- Ingreso -->
+      <form id="loginForm" class="d-none" novalidate>
+        <label class="form-label" for="email">Correo</label>
+        <input id="email" name="email" type="email" class="form-control mb-3" required autocomplete="username">
+        <label class="form-label" for="password">Contraseña</label>
+        <input id="password" name="password" type="password" class="form-control mb-2" required autocomplete="current-password">
+        <div class="invalid-feedback d-block small mb-2" id="loginErr"></div>
         <button type="submit" class="btn btn-primary w-100 mt-2">Entrar</button>
+        <p class="text-body-secondary small text-center mt-3 mb-0">¿Olvidaste tu contraseña? Pide un link nuevo al administrador del consultorio.</p>
+      </form>
+
+      <!-- Crear o restablecer la contraseña (link de invitación) -->
+      <form id="inviteForm" class="d-none" novalidate>
+        <input type="email" id="inviteEmail" class="d-none" autocomplete="username">
+        <label class="form-label" for="name">Tu nombre</label>
+        <input id="name" name="name" class="form-control mb-3" maxlength="100" autocomplete="name">
+        <label class="form-label" for="newPassword">Contraseña nueva (mínimo 8 caracteres)</label>
+        <input id="newPassword" name="password" type="password" minlength="8" class="form-control mb-3" required autocomplete="new-password">
+        <label class="form-label" for="newPassword2">Repite la contraseña</label>
+        <input id="newPassword2" name="password2" type="password" minlength="8" class="form-control mb-2" required autocomplete="new-password">
+        <div class="invalid-feedback d-block small mb-2" id="inviteErr"></div>
+        <button type="submit" class="btn btn-primary w-100 mt-2">Guardar y entrar</button>
       </form>
     </div>
   </main>
@@ -43,41 +50,63 @@
       const $ = (id) => document.getElementById(id);
       const next = App.param('next');
       const target = next && next.startsWith('/admin') ? next : '/admin/';
-      let me;
-      try {
-        me = await App.api('/auth/me');
-      } catch (err) {
-        $('who').textContent = err.message;
-        return;
-      }
-      if (me.session) { location.replace(target); return; }
 
-      const firstTime = !me.hasPin;
-      $('who').textContent = me.email;
-      $('pinForm').classList.remove('d-none');
-      if (firstTime) {
-        $('nameField').classList.remove('d-none');
-        $('confirmField').classList.remove('d-none');
-        $('pin2').required = true;
-        $('pinLabel').textContent = 'Crea tu PIN (4 a 8 dígitos)';
-        $('name').value = me.name || '';
-        $('name').focus();
-      } else {
-        $('pin').focus();
-      }
-
-      App.onSubmit($('pinForm'), async (d) => {
-        $('err').textContent = '';
-        if (firstTime && d.pin !== d.pin2) { $('err').textContent = 'Los PIN no coinciden'; return; }
+      // El token viaja en el fragmento (#invite=…): no queda en logs ni en el Referer.
+      async function showInvite(token, notice) {
+        let info;
         try {
-          await App.api('/auth/pin', { method: 'POST', body: { pin: d.pin, name: d.name } });
+          info = await App.api('/auth/invite?token=' + encodeURIComponent(token));
+        } catch (err) {
+          $('who').textContent = err.message;
+          return showLogin();
+        }
+        $('loginForm').classList.add('d-none');
+        $('inviteForm').classList.remove('d-none');
+        $('who').textContent = notice || (info.reset ? `Nueva contraseña para ${info.email}` : `Bienvenida/o, ${info.email}`);
+        $('inviteEmail').value = info.email;
+        $('name').value = info.name || '';
+        (info.name ? $('newPassword') : $('name')).focus();
+
+        App.onSubmit($('inviteForm'), async (d) => {
+          $('inviteErr').textContent = '';
+          if (d.password !== d.password2) { $('inviteErr').textContent = 'Las contraseñas no coinciden'; return; }
+          try {
+            await App.api('/auth/invite', { method: 'POST', body: { token, password: d.password, name: d.name } });
+            history.replaceState(null, '', location.pathname + location.search);
+            location.replace(target);
+          } catch (err) {
+            $('inviteErr').textContent = err.message;
+          }
+        });
+      }
+
+      function showLogin() {
+        $('loginForm').classList.remove('d-none');
+        if ($('who').textContent === 'Cargando…') $('who').textContent = 'Ingresa con tu correo y contraseña';
+        $('email').focus();
+      }
+
+      App.onSubmit($('loginForm'), async (d) => {
+        $('loginErr').textContent = '';
+        try {
+          const r = await App.api('/auth/login', { method: 'POST', body: { email: d.email, password: d.password } });
+          if (r.mustSetPassword) return showInvite(r.invite, 'El PIN ya no se usa: crea una contraseña para seguir.');
           location.replace(target);
         } catch (err) {
-          $('err').textContent = err.message;
-          $('pin').value = '';
-          $('pin').focus();
+          $('loginErr').textContent = err.message;
+          $('password').value = '';
+          $('password').focus();
         }
       });
+
+      const invite = new URLSearchParams(location.hash.slice(1)).get('invite');
+      if (invite) return showInvite(invite);
+      try {
+        await App.api('/auth/me');
+        location.replace(target);
+      } catch {
+        showLogin();
+      }
     })();
   </script>
 </body>

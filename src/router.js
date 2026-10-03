@@ -19,6 +19,7 @@ export class Router {
   get(p, auth, h) { return this.add('GET', p, auth, h); }
   post(p, auth, h) { return this.add('POST', p, auth, h); }
   put(p, auth, h) { return this.add('PUT', p, auth, h); }
+  patch(p, auth, h) { return this.add('PATCH', p, auth, h); }
   delete(p, auth, h) { return this.add('DELETE', p, auth, h); }
 
   match(method, pathname) {
