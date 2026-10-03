@@ -9,9 +9,10 @@ import * as appointmentsApi from './api/appointments.js';
 import * as filesApi from './api/files.js';
 import * as businessApi from './api/business.js';
 import * as superApi from './api/super.js';
+import * as cuerpoApi from './api/cuerpo.js';
 
 const router = new Router();
-for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, superApi]) {
+for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, superApi, cuerpoApi]) {
   mod.routes(router);
 }
 

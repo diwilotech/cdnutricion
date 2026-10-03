@@ -80,7 +80,7 @@
 
       $('rows').addEventListener('click', (ev) => {
         const tr = ev.target.closest('tr[data-id]');
-        if (tr) location.href = `/admin/paciente?id=${tr.dataset.id}`;
+        if (tr) location.href = `/admin/cuerpo?id=${tr.dataset.id}`;
       });
       $('pager').addEventListener('click', (ev) => {
         const b = ev.target.closest('[data-page]');
@@ -89,7 +89,7 @@
       $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { page = 1; load(); }, 250); });
       $('status').addEventListener('change', () => { page = 1; load(); });
 
-      const openNew = () => Forms.patientDialog(null, (id) => (location.href = `/admin/paciente?id=${id}`));
+      const openNew = () => Forms.patientDialog(null, (id) => (location.href = `/admin/cuerpo?id=${id}`));
       $('newBtn').addEventListener('click', openNew);
       if (App.param('new')) openNew();
 

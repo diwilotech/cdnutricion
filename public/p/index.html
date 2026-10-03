@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Mi seguimiento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/cv/cuerpo.css">
+</head>
+<body>
+  <div id="root"><div class="cv-center"><p class="empty">Cargando tu seguimiento…</p></div></div>
+  <script src="/cv/cuerpo.js"></script>
+  <script>
+    // Portal del paciente. El token va en el fragmento (#), que el navegador nunca envía al servidor
+    // en la URL; se manda solo en el encabezado x-portal-token de cada llamada.
+    (async () => {
+      const root = document.getElementById('root');
+      const token = location.hash.slice(1);
+      const fail = (msg) => {
+        root.innerHTML = `<div class="cv-center"><div><h2 style="font-family:var(--display)">No pudimos abrir tu seguimiento</h2><p class="empty">${msg.replace(/[<>&]/g, '')}</p></div></div>`;
+      };
+      if (!/^[0-9a-f]{64}$/.test(token)) { fail('El enlace está incompleto. Ábrelo de nuevo desde el mensaje de tu nutricionista.'); return; }
+
+      async function api(path, { method = 'GET', body } = {}) {
+        const res = await fetch('/api/p' + path, {
+          method,
+          headers: { 'x-cdn': '1', 'x-portal-token': token, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+        if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
+        return data;
+      }
+
+      let data;
+      try { data = await api('/cuerpo'); } catch (err) { fail(err.message); return; }
+      document.title = `${data.patient.first_name} · ${data.business}`;
+      await CuerpoVivo.start({
+        root, mode: 'paciente', canSwitch: false, data,
+        api: {
+          saveLog: (day, doc) => api(`/log/${day}`, { method: 'PUT', body: { data: doc } }),
+          saveTracking: (tracking) => api('/tracking', { method: 'PUT', body: { tracking } }),
+        },
+      });
+      if (data.nextAppointment) {
+        const [d, t] = data.nextAppointment.starts_at.split('T');
+        const [y, m, dd] = d.split('-').map(Number);
+        const day = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+        document.getElementById('cvActions').innerHTML = `<span class="pill">Próxima cita: ${day} · ${t}</span>`;
+      }
+    })();
+  </script>
+</body>
+</html>

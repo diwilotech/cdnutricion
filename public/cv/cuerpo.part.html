@@ -1,0 +1,322 @@
+<div class="wrap" id="app">
+  <header class="top">
+    <div id="cvBack"></div>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="5" r="3.2" fill="var(--accent-ink)"/><path d="M4 18c0-5 2.5-8.5 6-8.5S16 13 16 18" fill="none" stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </div>
+      <h1>Cuerpo Vivo</h1>
+    </div>
+    <div class="seg" role="group" aria-label="Ver como" id="rolSeg">
+      <button id="rolPaciente" aria-pressed="true">Paciente</button>
+      <button id="rolNutri" aria-pressed="false">Nutricionista</button>
+    </div>
+    <div id="cvActions" class="cv-actions"></div>
+    <div class="who">
+      <div class="avatar" id="avatar" aria-hidden="true">MG</div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button role="tab" data-tab="cuerpo" aria-selected="true">Mi cuerpo</button>
+    <button role="tab" data-tab="medidas" aria-selected="false">Medidas</button>
+    <button role="tab" data-tab="salud" aria-selected="false">Salud</button>
+    <button role="tab" data-tab="evolucion" aria-selected="false">Evolución</button>
+    <button role="tab" data-tab="plan" aria-selected="false">Plan del día</button>
+  </nav>
+  <p class="note" id="nota"></p>
+
+  <main class="grid" id="mainGrid">
+    <section class="stage" aria-label="Cuerpo animado">
+      <div class="stage-head">
+        <div>
+          <div class="eyebrow" id="stageWho">María Gómez · 34 años</div>
+          <h2 id="stageTitle">Composición corporal</h2>
+        </div>
+        <div class="seg" role="group" aria-label="Vista del cuerpo">
+          <button id="vCapas" aria-pressed="true">Capas</button>
+          <button id="vSilueta" aria-pressed="false">Silueta</button>
+          <button id="vMedidas" aria-pressed="false">Medidas</button>
+        </div>
+      </div>
+      <div class="figure" id="figure">
+        <svg viewBox="0 0 260 430" role="img" aria-label="Figura humana que cambia según grasa y músculo" id="bodySvg">
+          <defs>
+            <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--accent)" stop-opacity="0"/>
+              <stop offset=".85" stop-color="var(--halo)" stop-opacity=".025"/>
+              <stop offset="1" stop-color="var(--halo)" stop-opacity=".12"/>
+            </linearGradient>
+          </defs>
+          <g id="gridLines"></g>
+          <ellipse class="shadow" id="shadow" cx="130" cy="408" rx="58" ry="8" fill="var(--good)"/>
+          <g class="breathe" id="figureG">
+            <path class="tape" id="tapeBack" style="stroke-opacity:.6"/>
+            <g class="layer lay-haloA" id="lHaloA"></g>
+            <g class="layer lay-haloB" id="lHaloB"></g>
+            <g class="layer lay-fat" id="lFat"></g>
+            <g class="layer lay-musO" id="lMusO"></g>
+            <g class="layer lay-core" id="lCore"></g>
+            <g class="tape-wrap"><path class="tape" id="tapeFront"/><path class="tape-ticks" id="tapeTicks"/></g>
+          </g>
+          <rect class="scan" x="0" y="0" width="260" height="24"/>
+          <g class="medg callout" id="medG"></g>
+          <g class="callout" id="riskCallouts"></g>
+          <g class="callout" id="medCallouts"></g>
+          <g class="callout" id="lesCallouts"></g>
+          <g class="callout" id="callouts">
+            <line id="cl1" x1="56" y1="78" x2="70" y2="110"/>
+            <circle id="cd1" cx="70" cy="110" r="1.8"/>
+            <text class="k" x="8" y="62">MÚSCULO</text>
+            <text id="tMus" x="8" y="75">27 %</text>
+            <line id="cl2" x1="206" y1="170" x2="180" y2="165"/>
+            <circle id="cd2" cx="180" cy="165" r="1.8"/>
+            <text class="k" x="252" y="154" text-anchor="end">GRASA</text>
+            <text id="tFat" x="252" y="167" text-anchor="end">30 %</text>
+            <text class="k" x="252" y="222" text-anchor="end">IMC</text>
+            <text id="tImc" x="252" y="235" text-anchor="end">26,2</text>
+          </g>
+        </svg>
+        <div class="burst" id="burst"></div>
+      </div>
+      <div class="legend" id="legend">
+        <span><i style="background:var(--fat)"></i>Grasa</span>
+        <span><i style="background:var(--muscle)"></i>Músculo</span>
+        <span><i id="legHalo" style="background:var(--good)"></i>Halo: estado de salud</span>
+        <span><i style="background:var(--tape)"></i>Cintura</span>
+        <span class="les-leg">Lesiones: <i style="background:var(--warn);margin-left:6px"></i>Leve <i style="background:var(--fat);margin-left:6px"></i>Moderada <i style="background:var(--bad);margin-left:6px"></i>Severa</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <!-- MI CUERPO -->
+      <div data-panel="cuerpo" class="panel">
+        <div class="card" id="riskBanner"></div>
+        <div class="card">
+          <div class="health">
+            <div class="ring">
+              <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="50"/><circle class="val" id="ringVal" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg>
+              <div class="lbl"><div><b id="score" class="num">0</b><small>de 100</small></div></div>
+            </div>
+            <div style="min-width:0">
+              <div class="eyebrow">Índice de salud</div>
+              <div class="state" id="stateTxt">Buena</div>
+              <div class="levels" id="levels"><div></div><div></div><div></div><div></div><div></div></div>
+              <div class="lvname">Nivel <b id="lvNum">4</b> · <b id="lvName">En forma</b> <span id="lvNext"></span></div>
+            </div>
+          </div>
+          <div class="stats" style="margin-top:16px">
+            <div class="stat"><div class="k">Peso</div><div class="v" id="sPeso">74</div><div class="t" style="color:var(--muted)">kg</div></div>
+            <div class="stat"><div class="k">IMC</div><div class="v" id="sImc">26,2</div><div class="t" id="sImcCat">Sobrepeso</div></div>
+            <div class="stat"><div class="k">Masa grasa</div><div class="v" id="sGrasa">22,2</div><div class="t" id="sGrasaCat">kg</div></div>
+            <div class="stat"><div class="k">Masa muscular</div><div class="v" id="sMus">20,0</div><div class="t" id="sMusCat">kg</div></div>
+          </div>
+          <div class="gauge">
+            <div class="eyebrow" style="margin-bottom:6px">IMC según OMS</div>
+            <div class="gwrap">
+              <div class="bar">
+                <span style="width:14%;background:var(--water)"></span>
+                <span style="width:26%;background:var(--good)"></span>
+                <span style="width:20%;background:var(--warn)"></span>
+                <span style="width:40%;background:var(--bad)"></span>
+              </div>
+              <div class="marker" id="imcMarker" style="left:40%"></div>
+            </div>
+            <div class="scale num"><span>15</span><span>18,5</span><span>25</span><span>30</span><span>40</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:4px">
+            <h3 style="margin:0">Antropometría</h3>
+            <button class="ghost" id="btnVerMed">Ver todas las medidas</button>
+          </div>
+          <div class="calc" id="antroResumen" style="border-top:0;margin-top:0"></div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0">Simular cambios</h3>
+            <button class="ghost" id="btnReset">Volver a la última medición</button>
+          </div>
+          <div class="ctrl">
+            <div><label for="inPeso">Peso <span id="oPeso">74 kg</span></label><input type="range" id="inPeso" min="40" max="150" step="0.5"></div>
+            <div><label for="inTalla">Estatura <span id="oTalla">168 cm</span></label><input type="range" id="inTalla" min="140" max="200" step="1"></div>
+            <div><label for="inGrasa">Grasa corporal <span id="oGrasa">30 %</span></label><input type="range" id="inGrasa" min="5" max="50" step="0.5"></div>
+            <div><label for="inMus">Músculo esquelético <span id="oMus">27 %</span></label><input type="range" id="inMus" min="15" max="50" step="0.5"></div>
+            <div class="full">
+              <span style="font-size:13px;font-weight:600">Sexo</span>
+              <div class="seg" role="group" aria-label="Sexo">
+                <button id="sxF" aria-pressed="true">Mujer</button>
+                <button id="sxM" aria-pressed="false">Hombre</button>
+              </div>
+              <span class="empty" style="font-size:12.5px">La simulación no se guarda.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 id="recTitle">Recomendaciones de tu nutricionista</h3>
+          <div class="recs" id="recs"></div>
+          <div class="composer">
+            <div class="eyebrow">Escribir recomendación</div>
+            <div class="chips" id="chips"></div>
+            <label for="recText" class="eyebrow" hidden>Texto</label>
+            <textarea id="recText" placeholder="Escribe una recomendación para este paciente"></textarea>
+            <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" id="btnRec">Enviar al paciente</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEDIDAS -->
+      <div data-panel="medidas" class="panel" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div>
+              <h3 style="margin:0 0 4px">Medidas de la consulta</h3>
+              <p class="empty" style="margin:0" id="medInfo"></p>
+              <div class="hist-chips" id="medHist"></div>
+            </div>
+            <div class="row" style="gap:8px"><button class="ghost only-nutri-btn" id="btnRapida">Nueva medición rápida</button><button class="primary only-nutri-btn" id="btnGuardarMed">Guardar medición</button></div>
+          </div>
+        </div>
+        <div id="medGroups" class="panel"></div>
+      </div>
+
+      <!-- SALUD -->
+      <div data-panel="salud" class="panel" id="saludPanel" hidden>
+        <div class="card">
+          <h3>Ajustes al plan de alimentación</h3>
+          <ul class="alerts" id="planAlerts"></ul>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+            <div><h3 style="margin:0 0 2px">Exámenes de sangre</h3><p class="empty" style="margin:0" id="labInfo"></p></div>
+            <button class="primary only-nutri-btn" id="btnNewLab">Registrar examen</button>
+          </div>
+          <div id="labFormBox" class="formbox" hidden>
+            <div class="row" style="margin-bottom:10px"><label for="labDate" style="font-weight:600;font-size:13px">Fecha del examen</label><input type="date" id="labDate" value="" class="tin" style="max-width:180px"></div>
+            <div class="fields" id="labForm"></div>
+            <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" id="btnSaveLab">Guardar examen</button></div>
+          </div>
+          <div class="tablebox flat">
+            <table class="labs"><thead><tr><th>Examen</th><th>Resultado</th><th>Cambio</th><th>Tendencia</th><th>Referencia</th><th>Estado</th></tr></thead><tbody id="labBody"></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Diagnósticos y riesgos</h3>
+          <div class="eyebrow">Riesgos de salud a tener presente</div>
+          <ul class="clist" id="riskList"></ul>
+          <div class="addrow nutri-only">
+            <select class="tin" id="rkType" aria-label="Tipo de riesgo" style="max-width:170px"><option value="cv">Cardiovascular</option><option value="renal">Renal</option><option value="metab">Metabólico</option><option value="hep">Hepático</option><option value="nutri">Nutricional</option><option value="oseo">Óseo</option><option value="art">Articular</option><option value="col">Columna</option><option value="resp">Respiratorio</option><option value="dig">Digestivo</option><option value="tiroides">Tiroides</option><option value="circ">Circulación</option><option value="mental">Salud mental</option><option value="otro">Otro</option></select>
+            <select class="tin" id="rkLv" aria-label="Nivel" style="max-width:130px"><option value="1">Moderado</option><option value="2">Alto</option><option value="0">Bajo</option></select>
+            <input class="tin" id="rkNote" placeholder="Por qué, ej. LDL alto y fuma" aria-label="Nota del riesgo">
+            <button class="ghost" id="btnAddRisk">Agregar</button>
+          </div>
+          <div class="eyebrow" style="margin-top:16px">Diagnósticos</div>
+          <ul class="clist" id="condList"></ul>
+          <div class="addrow nutri-only"><input class="tin" id="condName" placeholder="Diagnóstico, ej. Hipotiroidismo" aria-label="Diagnóstico"><input class="tin" id="condYear" placeholder="Año" aria-label="Año" style="max-width:90px"><button class="ghost" id="btnAddCond">Agregar</button></div>
+        </div>
+        <div class="card">
+          <h3>Lesiones y molestias</h3>
+          <ul class="clist" id="lesList"></ul>
+          <div class="addrow nutri-only">
+            <select class="tin" id="lsZona" aria-label="Zona" style="max-width:170px"></select>
+            <select class="tin" id="lsLv" aria-label="Intensidad" style="max-width:130px"><option value="0">Leve</option><option value="1">Moderada</option><option value="2">Severa</option></select>
+            <input class="tin" id="lsNote" placeholder="Qué tiene, ej. Artrosis" aria-label="Descripción de la lesión">
+            <input class="tin" id="lsYear" placeholder="Año" aria-label="Año" style="max-width:80px">
+            <button class="ghost" id="btnAddLes">Agregar</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Medicamentos</h3>
+          <div class="tablebox flat">
+            <table class="meds"><thead><tr><th>Medicamento</th><th>Dosis</th><th>Horario</th><th>Para qué</th><th></th></tr></thead><tbody id="medBody"></tbody></table>
+          </div>
+          <div class="addrow nutri-only"><input class="tin" id="medName" placeholder="Nombre" aria-label="Nombre del medicamento"><input class="tin" id="medDose" placeholder="Dosis, ej. 20 mg" aria-label="Dosis"><input class="tin" id="medTime" placeholder="Horario" aria-label="Horario"><input class="tin" id="medFor" placeholder="Para qué" aria-label="Para qué"><button class="ghost" id="btnAddMed">Agregar</button></div>
+        </div>
+        <div class="card">
+          <h3>Alergias, antecedentes y hábitos</h3>
+          <div class="three">
+            <div><div class="eyebrow">Alergias e intolerancias</div><ul class="clist" id="alerList"></ul><div class="addrow nutri-only"><input class="tin" id="alerIn" placeholder="Agregar" aria-label="Agregar alergia"><button class="ghost" id="btnAlerAdd">+</button></div></div>
+            <div><div class="eyebrow">Antecedentes familiares</div><ul class="clist" id="antList"></ul><div class="addrow nutri-only"><input class="tin" id="antIn" placeholder="Agregar" aria-label="Agregar antecedente"><button class="ghost" id="btnAntAdd">+</button></div></div>
+            <div><div class="eyebrow">Hábitos</div><ul class="clist" id="habList"></ul><div class="addrow nutri-only"><input class="tin" id="habIn" placeholder="Agregar" aria-label="Agregar hábito"><button class="ghost" id="btnHabAdd">+</button></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EVOLUCIÓN -->
+      <div data-panel="evolucion" class="panel" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <h3 style="margin:0">Así ha cambiado el cuerpo</h3>
+            <button class="primary" id="btnPlay">Reproducir evolución</button>
+          </div>
+          <p class="empty" style="margin:0 0 10px">Toca una fecha o reproduce la secuencia para ver la figura transformarse.</p>
+          <div class="timeline" id="timeline"></div>
+          <div class="delta" id="delta"></div>
+        </div>
+        <div class="card chart">
+          <h3>Peso (kg)</h3>
+          <div id="chPeso"></div>
+        </div>
+        <div class="card chart">
+          <h3>Composición (%)</h3>
+          <div class="mk"><span><i style="background:var(--fat)"></i>Grasa</span><span><i style="background:var(--muscle)"></i>Músculo</span></div>
+          <div id="chComp"></div>
+        </div>
+      </div>
+
+      <!-- PLAN -->
+      <div data-panel="plan" class="panel" hidden>
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <h3 style="margin:0">Plan de alimentación</h3>
+              <p class="empty" style="margin:2px 0 0" id="planSub"></p>
+            </div>
+            <div class="row" style="gap:10px"><span class="num" id="progTxt">0 de 5 tiempos</span><button class="primary only-nutri-btn" id="btnEditPlan">Editar plan</button></div>
+          </div>
+          <div class="edithint" id="editHint" hidden>Estás editando el plan de <b id="ehName"></b>. Cambia nombres, horas, notas y lo que lleva cada comida; usa ↑ ↓ para ordenar. Los cambios se guardan al escribir.</div>
+          <div class="kcalbar" style="margin-top:12px"><div id="progBar"></div></div>
+        </div>
+        <div class="meals" id="meals"></div>
+        <div class="card">
+          <h3>Metas</h3>
+          <div class="goals" id="goals"></div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <h3 style="margin:0">Agua</h3>
+            <div class="row" style="gap:8px"><label class="ef inline only-nutri-btn" id="aguaMetaBox" hidden><span>Meta</span><select class="tin" id="aguaMetaSel"><option value="1.5">1,5 L</option><option value="2" selected>2 L</option><option value="2.5">2,5 L</option><option value="3">3 L</option></select></label>
+            <div class="seg" role="group" aria-label="Unidad del agua"><button id="uVasos" aria-pressed="true">Vasos</button><button id="uLitros" aria-pressed="false">Litros</button></div></div>
+          </div>
+          <div class="water">
+            <div class="glasses" id="glasses"></div>
+            <div class="bottle" id="bottle" hidden><div class="bfill" id="bfill"></div><div class="bmarks" id="bmarks"></div></div>
+            <div class="wtxt"><b class="num" id="aguaTxt">0 de 8 vasos</b><span class="empty" id="aguaSub">1 vaso = 250 ml · meta 2 litros al día</span>
+              <div class="row" id="wBtns" hidden style="gap:6px;margin-top:8px"><button class="ghost" id="wMinus">− 250 ml</button><button class="primary" id="wPlus">+ 250 ml</button></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div>
+              <h3 style="margin:0 0 4px">Lista de intercambios</h3>
+              <p class="empty" style="margin:0" id="interHint">Cada alimento equivale a 1 porción en la cantidad indicada.</p>
+            </div>
+          </div>
+          <div class="st-legend">
+            <span><mark class="st pref">Recomendado</mark></span>
+            <span><span class="st">Permitido</span></span>
+            <span><span class="st lim">Con moderación</span></span>
+            <span><span class="st evitar">Evitar</span></span>
+            <span style="display:inline-flex;align-items:center;gap:6px"><span class="st">Alimento<span class="flag">!</span></span><span class="empty" style="font-size:12.5px">Limitar por su salud</span></span>
+          </div>
+          <div class="xgroups" id="xgroups"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>

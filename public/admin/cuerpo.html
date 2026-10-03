@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cuerpo Vivo · CD Nutrición</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/cv/cuerpo.css">
+</head>
+<body>
+  <div id="root"><div class="cv-center"><p class="empty">Cargando…</p></div></div>
+
+  <dialog class="cv-dialog" id="linkDialog">
+    <h3>Enlace del paciente</h3>
+    <p class="empty" id="linkStatus" style="margin:0"></p>
+    <div id="linkBox" hidden>
+      <input id="linkUrl" readonly aria-label="Enlace">
+      <div class="row" style="gap:8px">
+        <button class="primary" id="linkCopy">Copiar</button>
+        <a class="ghost" id="linkWa" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+      </div>
+      <p class="empty" style="font-size:12.5px;margin:10px 0 0">Guárdalo ahora: por seguridad no se vuelve a mostrar. Quien tenga el enlace puede ver el seguimiento.</p>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:16px;gap:8px">
+      <button class="ghost danger" id="linkRevoke" hidden>Desactivar enlace</button>
+      <span style="margin-left:auto;display:flex;gap:8px">
+        <button class="ghost" id="linkClose">Cerrar</button>
+        <button class="primary" id="linkNew">Crear enlace</button>
+      </span>
+    </div>
+  </dialog>
+
+  <script src="/cv/cuerpo.js"></script>
+  <script>
+    (async () => {
+      const $ = (s) => document.querySelector(s);
+      const id = new URLSearchParams(location.search).get('id');
+      const root = $('#root');
+      const fail = (msg) => { root.innerHTML = `<div class="cv-center"><div><p>${msg.replace(/[<>&]/g, '')}</p><a class="ghost" href="/admin/pacientes">Volver a pacientes</a></div></div>`; };
+      if (!id) { location.href = '/admin/pacientes'; return; }
+
+      async function api(path, { method = 'GET', body } = {}) {
+        const res = await fetch('/api/admin' + path, {
+          method,
+          headers: { 'x-cdn': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+        if (!res.ok) {
+          if (data?.code === 'NO_SESSION') { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search); return new Promise(() => {}); }
+          if (data?.code === 'NO_BUSINESS') { location.href = '/admin/'; return new Promise(() => {}); }
+          throw new Error(data?.error || `Error ${res.status}`);
+        }
+        return data;
+      }
+
+      let data;
+      try { data = await api(`/patients/${id}/cuerpo`); } catch (err) { fail(err.message); return; }
+      const P = data.patient;
+      const who = data.user.name || data.user.email;
+      const initials = who.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+      document.title = `${P.first_name} ${P.last_name || ''} · Cuerpo Vivo`;
+
+      const put = (body) => api(`/patients/${id}/profile`, { method: 'PUT', body });
+      await CuerpoVivo.start({
+        root, mode: 'nutri', canSwitch: true, data, userName: who, userInitials: initials,
+        api: {
+          addRec: (text) => api(`/patients/${id}/recs`, { method: 'POST', body: { text } }),
+          addMeasure: (body) => api(`/patients/${id}/consultations`, { method: 'POST', body }),
+          updateMeasure: (cid, body) => api(`/consultations/${cid}`, { method: 'PUT', body }),
+          addLab: (body) => api(`/patients/${id}/labs`, { method: 'POST', body }),
+          saveClinical: (clinical) => put({ clinical }),
+          savePlan: (plan) => put({ plan }),
+          saveTracking: (tracking) => put({ tracking }),
+        },
+      });
+
+      $('#cvBack').innerHTML = '<a class="cv-back" href="/admin/pacientes">← Pacientes</a>';
+      $('#cvActions').innerHTML = `<a class="ghost" href="/admin/paciente?id=${encodeURIComponent(id)}">Ficha, citas y archivos</a>
+        <button class="primary" id="btnLink">Enlace del paciente</button>`;
+
+      // ---------- enlace privado del paciente ----------
+      const dlg = $('#linkDialog');
+      let portal = data.portal;
+      const fmt = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+      function paint(url) {
+        $('#linkStatus').textContent = portal
+          ? `Hay un enlace activo desde ${fmt(portal.created_at)}${portal.last_used_at ? ` · último ingreso ${fmt(portal.last_used_at)}` : ' · aún sin usar'}. Crear uno nuevo desactiva el anterior.`
+          : `${P.first_name} todavía no tiene enlace. Con él verá su cuerpo, medidas, salud, evolución y plan, sin usuario ni contraseña.`;
+        $('#linkBox').hidden = !url;
+        $('#linkRevoke').hidden = !portal;
+        $('#linkNew').textContent = portal ? 'Crear enlace nuevo' : 'Crear enlace';
+        if (url) {
+          $('#linkUrl').value = url;
+          const digits = (P.phone || '').replace(/\D/g, '');
+          const phone = digits.length === 10 ? '57' + digits : digits;
+          const text = `Hola ${P.first_name}, este es tu enlace de seguimiento con ${data.business}: ${url}`;
+          $('#linkWa').href = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+          $('#linkWa').hidden = false;
+        }
+      }
+      $('#btnLink').onclick = () => { paint(null); dlg.showModal(); };
+      $('#linkClose').onclick = () => dlg.close();
+      $('#linkNew').onclick = async () => {
+        try {
+          const r = await api(`/patients/${id}/portal`, { method: 'POST' });
+          portal = { created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), last_used_at: null };
+          paint(r.url);
+        } catch (err) { $('#linkStatus').textContent = err.message; }
+      };
+      $('#linkRevoke').onclick = async () => {
+        if (!confirm('El paciente ya no podrá entrar con su enlace actual. ¿Desactivarlo?')) return;
+        try {
+          await api(`/patients/${id}/portal`, { method: 'DELETE' });
+          portal = null;
+          paint(null);
+        } catch (err) { $('#linkStatus').textContent = err.message; }
+      };
+      $('#linkCopy').onclick = async () => {
+        $('#linkUrl').select();
+        try { await navigator.clipboard.writeText($('#linkUrl').value); $('#linkCopy').textContent = 'Copiado'; }
+        catch { document.execCommand('copy'); }
+        setTimeout(() => ($('#linkCopy').textContent = 'Copiar'), 1500);
+      };
+    })();
+  </script>
+</body>
+</html>

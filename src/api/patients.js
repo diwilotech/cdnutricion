@@ -19,6 +19,28 @@ function patientFields(body) {
   };
 }
 
+function consultationFields(body) {
+  const measures = {};
+  for (const [k, v] of Object.entries(body.measures || {})) {
+    if (!/^\w{1,30}$/.test(k)) continue;
+    const n = num(v, { min: 0, max: 1000, label: k });
+    if (n !== null) measures[k] = n;
+  }
+  return {
+    date: date(body.date, { required: true }),
+    weight_kg: num(body.weight_kg, { min: 1, max: 400, label: 'Peso' }),
+    fat_pct: num(body.fat_pct, { min: 1, max: 80, label: 'Grasa' }),
+    muscle_pct: num(body.muscle_pct, { min: 1, max: 80, label: 'Músculo' }),
+    measures: Object.keys(measures).length ? JSON.stringify(measures) : null,
+    notes: str(body.notes, { max: 4000, label: 'Notas' }),
+    height_cm: num(body.height_cm, { min: 40, max: 250, label: 'Estatura' }),
+  };
+}
+
+// La estatura vive en el paciente; una medición puede actualizarla.
+const heightStmt = (db, c, patientId, height) =>
+  db.prepare(`UPDATE patients SET height_cm = ?, updated_at = datetime('now') WHERE business_id = ? AND id = ?`, height, c.businessId, patientId);
+
 export async function getPatient(db, bid, id) {
   const p = await db.first('SELECT * FROM patients WHERE business_id = ? AND id = ?', bid, id);
   if (!p) throw new HttpError(404, 'Paciente no encontrado');
@@ -128,26 +150,35 @@ export function routes(r) {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const body = await readJson(c.req);
-    const measures = {};
-    for (const [k, v] of Object.entries(body.measures || {})) {
-      if (!/^\w{1,30}$/.test(k)) continue;
-      const n = num(v, { min: 0, max: 1000, label: k });
-      if (n !== null) measures[k] = n;
-    }
+    const f = consultationFields(body);
     const id = uuid();
-    await db.run(
-      `INSERT INTO consultations (id, business_id, patient_id, date, weight_kg, fat_pct, muscle_pct, measures, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      id, c.businessId, c.params.id,
-      date(body.date, { required: true }),
-      num(body.weight_kg, { min: 1, max: 400, label: 'Peso' }),
-      num(body.fat_pct, { min: 1, max: 80, label: 'Grasa' }),
-      num(body.muscle_pct, { min: 1, max: 80, label: 'Músculo' }),
-      Object.keys(measures).length ? JSON.stringify(measures) : null,
-      str(body.notes, { max: 4000, label: 'Notas' }),
-      c.user.id,
-    );
+    const stmts = [
+      db.prepare(
+        `INSERT INTO consultations (id, business_id, patient_id, date, weight_kg, fat_pct, muscle_pct, measures, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, c.businessId, c.params.id, f.date, f.weight_kg, f.fat_pct, f.muscle_pct, f.measures, f.notes, c.user.id,
+      ),
+    ];
+    if (f.height_cm) stmts.push(heightStmt(db, c, c.params.id, f.height_cm));
+    await db.batch(stmts);
     return json({ id }, 201);
+  });
+
+  r.put('/api/admin/consultations/:id', 'tenant', async (c) => {
+    const db = tenantDb(c);
+    const current = await db.first('SELECT patient_id FROM consultations WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
+    if (!current) throw new HttpError(404, 'Consulta no encontrada');
+    const f = consultationFields(await readJson(c.req));
+    const stmts = [
+      db.prepare(
+        `UPDATE consultations SET date = ?, weight_kg = ?, fat_pct = ?, muscle_pct = ?, measures = ?, notes = ?
+          WHERE business_id = ? AND id = ?`,
+        f.date, f.weight_kg, f.fat_pct, f.muscle_pct, f.measures, f.notes, c.businessId, c.params.id,
+      ),
+    ];
+    if (f.height_cm) stmts.push(heightStmt(db, c, current.patient_id, f.height_cm));
+    await db.batch(stmts);
+    return json({ ok: true });
   });
 
   r.delete('/api/admin/consultations/:id', 'tenant', async (c) => {

@@ -78,7 +78,7 @@
                 ${list.length ? list.map((a) => `
                   <div class="list-group-item d-flex flex-wrap align-items-center gap-3 py-3">
                     <span class="appt-time">${App.fmtTime(a.starts_at)}</span>
-                    <a href="/admin/paciente?id=${esc(a.patient_id)}" class="d-flex align-items-center gap-2 flex-grow-1 text-decoration-none text-body">
+                    <a href="/admin/cuerpo?id=${esc(a.patient_id)}" class="d-flex align-items-center gap-2 flex-grow-1 text-decoration-none text-body">
                       <span class="avatar">${esc(App.initials(a))}</span>
                       <span><span class="d-block fw-medium">${esc(App.fullName(a))}</span>
                       <span class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min${a.notes ? ' · ' + esc(a.notes) : ''}</span></span>

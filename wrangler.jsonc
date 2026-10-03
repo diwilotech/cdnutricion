@@ -13,6 +13,12 @@
   // Conserva las variables cargadas en el dashboard (ACCESS_*, SUPERADMIN_EMAILS…) en cada deploy.
   "keep_vars": true,
 
+  // En Workers Builds (WORKERS_CI=1) aplica las migraciones de D1 pendientes antes de desplegar.
+  // En local no hace nada. Si una migración falla, el despliegue se detiene.
+  "build": {
+    "command": "sh -c 'if [ -n \"$WORKERS_CI\" ]; then npx wrangler d1 migrations apply cdnutricion --remote; fi'"
+  },
+
   // Frontend: HTML sueltas servidas por el mismo Worker.
   // /api/* y /admin/* pasan primero por el Worker (auth + tenant).
   "assets": {

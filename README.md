@@ -19,11 +19,25 @@ src/
   lib/                http, db (guardia de tenant), auth (Access + PIN + sesión), time
   api/                auth, dashboard, patients (+consultas), appointments, files, business (+equipo), super
   integrations/       whatsapp, email
-public/admin/         login, index (dashboard), pacientes, paciente, citas, ajustes, negocios (superadmin)
+public/admin/         login, index (dashboard), pacientes, cuerpo (Cuerpo Vivo), paciente (ficha), citas, ajustes, negocios
+public/cv/            Cuerpo Vivo: CSS, HTML parcial y JS compartidos por la nutricionista y el paciente
+public/p/             portal del paciente (/p/#<token>)
 migrations/           esquema D1
 scripts/seed.sql      datos de ejemplo (solo local)
 docs/prototipo/       prototipo visual "Cuerpo Vivo"
 ```
+
+### Cuerpo Vivo
+
+Al abrir un paciente (desde Pacientes, Citas o Inicio) se abre `/admin/cuerpo?id=…`: figura animada, medidas con
+estimación antropométrica, salud (exámenes, riesgos, lesiones, medicamentos), evolución y plan de alimentación.
+La nutricionista puede cambiar a la vista *Paciente* para ver exactamente lo que ve el paciente.
+
+Con **Enlace del paciente** se genera un enlace privado `/p/#<token>` (se guarda solo su SHA-256; crear uno nuevo
+desactiva el anterior). El paciente ve su seguimiento sin usuario ni contraseña y puede marcar comidas, agua y metas.
+El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`.
+
+**Access debe proteger solo `/admin` y `/api/admin`**: `/p/`, `/cv/` y `/api/p/` son públicos (el token protege los datos).
 
 ### Roles
 
@@ -69,6 +83,7 @@ En local no hay Cloudflare Access: el Worker usa `DEV_EMAIL` como identidad. En 
    npx wrangler secret put EVOLUTION_URL        # opcional
    npx wrangler secret put EVOLUTION_KEY        # opcional
    ```
-4. **Workers Builds:** en el dashboard del Worker → Settings → Builds → conectar `diwilotech/cdnutricion`, rama `main`, comando de despliegue `npm run deploy` (aplica migraciones y despliega). Cada push a `main` despliega.
+4. **Migraciones:** en Workers Builds el paso `build` de `wrangler.jsonc` aplica las migraciones pendientes antes de desplegar.
+5. **Workers Builds:** en el dashboard del Worker → Settings → Builds → conectar `diwilotech/cdnutricion`, rama `main`, comando de despliegue `npm run deploy` (aplica migraciones y despliega). Cada push a `main` despliega.
 
 Al agregar un miembro al equipo, su correo también debe estar permitido en la política de Access.

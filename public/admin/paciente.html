@@ -18,7 +18,7 @@
 </head>
 <body>
   <main class="container-xl py-4">
-    <a href="/admin/pacientes" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Pacientes</a>
+    <a href="javascript:history.back()" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Volver</a>
 
     <div class="card mt-2 mb-3"><div class="card-body" id="header">
       <div class="placeholder-glow"><span class="placeholder col-4"></span></div>
@@ -136,6 +136,7 @@
             </div>
             <div class="d-flex gap-2">
               ${wa ? `<a class="btn btn-outline-success" href="${wa}" target="_blank" rel="noopener" title="Abrir WhatsApp"><i class="bi bi-whatsapp"></i></a>` : ''}
+              <a class="btn btn-primary" href="/admin/cuerpo?id=${esc(p.id)}"><i class="bi bi-person-arms-up me-1"></i>Cuerpo Vivo</a>
               <button class="btn btn-outline-primary" id="editBtn"><i class="bi bi-pencil me-1"></i>Editar</button>
               ${['owner', 'admin'].includes(App.me.session.role) ? '<button class="btn btn-outline-danger" id="deleteBtn" title="Eliminar paciente"><i class="bi bi-trash"></i></button>' : ''}
             </div>

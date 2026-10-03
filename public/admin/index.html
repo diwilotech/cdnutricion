@@ -102,7 +102,7 @@
 
       $('todayList').innerHTML = d.todayAppointments.length
         ? d.todayAppointments.map((a) => `
-            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" href="/admin/paciente?id=${esc(a.patient_id)}">
+            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" href="/admin/cuerpo?id=${esc(a.patient_id)}">
               <span class="appt-time">${App.fmtTime(a.starts_at)}</span>
               <span class="avatar">${esc(App.initials(a))}</span>
               <span class="flex-grow-1">
@@ -114,11 +114,11 @@
         : emptyRow('<i class="bi bi-cup-hot d-block fs-3 mb-1"></i>No hay citas para hoy');
 
       $('upcomingList').innerHTML = d.upcoming.length
-        ? d.upcoming.map((a) => personRow(a, `<span class="small text-body-secondary text-nowrap">${App.fmtDate(a.starts_at, { weekday: true }).split(' ').slice(0, 3).join(' ')} · ${App.fmtTime(a.starts_at)}</span>`, `/admin/paciente?id=${esc(a.patient_id)}`)).join('')
+        ? d.upcoming.map((a) => personRow(a, `<span class="small text-body-secondary text-nowrap">${App.fmtDate(a.starts_at, { weekday: true }).split(' ').slice(0, 3).join(' ')} · ${App.fmtTime(a.starts_at)}</span>`, `/admin/cuerpo?id=${esc(a.patient_id)}`)).join('')
         : emptyRow('Sin citas programadas');
 
       $('recentList').innerHTML = d.recentPatients.length
-        ? d.recentPatients.map((x) => personRow(x, `<span class="small text-body-secondary">${App.fmtDate(x.created_at)}</span>`, `/admin/paciente?id=${esc(x.id)}`)).join('')
+        ? d.recentPatients.map((x) => personRow(x, `<span class="small text-body-secondary">${App.fmtDate(x.created_at)}</span>`, `/admin/cuerpo?id=${esc(x.id)}`)).join('')
         : emptyRow('Aún no hay pacientes');
     })();
   </script>

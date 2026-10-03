@@ -224,7 +224,29 @@ export async function destroySession(env, sessionId) {
 //   'manager' : + rol owner/admin en el negocio
 //   'super'   : + superadministrador de la plataforma
 
+// Paciente con enlace privado: no pasa por Access ni PIN; el token (256 bits) es la credencial.
+async function authenticatePortal(c) {
+  const token = c.req.headers.get('x-portal-token') || '';
+  if (!/^[0-9a-f]{64}$/.test(token)) throw new HttpError(401, 'Enlace inválido', 'BAD_LINK');
+  const id = await sha256Hex(token);
+  const row = await globalDb(c.env).first(
+    `SELECT l.business_id, l.patient_id, b.timezone, b.status AS business_status, p.status AS patient_status
+       FROM portal_links l
+       JOIN businesses b ON b.id = l.business_id
+       JOIN patients p ON p.id = l.patient_id AND p.business_id = l.business_id
+      WHERE l.id = ? AND l.revoked_at IS NULL`,
+    id,
+  );
+  if (!row) throw new HttpError(401, 'Este enlace ya no es válido. Pide uno nuevo a tu nutricionista.', 'BAD_LINK');
+  if (row.business_status !== 'active' || row.patient_status !== 'active') throw new HttpError(403, 'Acceso no disponible');
+  c.businessId = row.business_id;
+  c.patientId = row.patient_id;
+  c.timezone = row.timezone || 'America/Bogota';
+  c.ctx?.waitUntil(globalDb(c.env).run(`UPDATE portal_links SET last_used_at = datetime('now') WHERE id = ?`, id));
+}
+
 export async function authenticate(c, level) {
+  if (level === 'portal') return authenticatePortal(c);
   c.email = await accessEmail(c.req, c.env);
   if (level === 'access') {
     c.user = await loadUser(c.env, c.email);
