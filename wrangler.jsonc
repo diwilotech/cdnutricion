@@ -10,6 +10,9 @@
   "workers_dev": false,
   "preview_urls": false,
 
+  // Conserva las variables cargadas en el dashboard (ACCESS_*, SUPERADMIN_EMAILS…) en cada deploy.
+  "keep_vars": true,
+
   // Frontend: HTML sueltas servidas por el mismo Worker.
   // /api/* y /admin/* pasan primero por el Worker (auth + tenant).
   "assets": {
