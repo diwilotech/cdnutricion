@@ -82,7 +82,12 @@ async function verifyAccessJwt(token, env) {
 
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   if (!aud.includes(env.ACCESS_AUD)) throw new HttpError(403, 'Audiencia de Access inválida');
-  if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) throw new HttpError(403, 'Emisor de Access inválido');
+  // La firma ya se validó con las llaves del equipo y el AUD es único por app.
+  // El emisor puede conservar el nombre anterior del equipo tras renombrarlo,
+  // así que solo exigimos que sea un dominio de Cloudflare Access.
+  if (!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/.test(payload.iss || '')) {
+    throw new HttpError(403, `Emisor de Access inválido (${String(payload.iss).slice(0, 80)})`);
+  }
   if (!payload.exp || payload.exp * 1000 < Date.now()) throw new HttpError(403, 'Sesión de Access expirada');
   if (!payload.email) throw new HttpError(403, 'Access no entregó un correo');
   return payload.email.toLowerCase();
