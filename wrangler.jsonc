@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cdnutricion",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Frontend: HTML sueltas servidas por el mismo Worker.
+  // /api/* y /admin/* pasan primero por el Worker (auth + tenant).
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/admin", "/admin/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cdnutricion",
+      "database_id": "REEMPLAZAR_CON_ID_DE_D1",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "cdnutricion-files" }
+  ],
+
+  "vars": {
+    "APP_NAME": "CD Nutrición",
+    "DEFAULT_COUNTRY_CODE": "57",
+    "SMTP_HOST": "smtp.gmail.com",
+    "SMTP_PORT": "465"
+  }
+
+  // Secretos (wrangler secret put <NOMBRE>), no van en el repo:
+  //   ACCESS_TEAM_DOMAIN   p. ej. miequipo.cloudflareaccess.com
+  //   ACCESS_AUD           Application Audience (AUD) tag de la app de Access
+  //   SUPERADMIN_EMAILS    correos separados por coma con acceso total
+  //   SMTP_USER / SMTP_PASS  cuenta Gmail + contraseña de aplicación
+  //   EVOLUTION_URL / EVOLUTION_KEY  servidor Evolution API
+}

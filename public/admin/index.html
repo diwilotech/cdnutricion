@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+</head>
+<body>
+  <main class="container-xl py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+      <div>
+        <h1 class="page-title" id="greeting">Inicio</h1>
+        <div class="text-body-secondary small" id="todayLabel"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/admin/citas?new=1"><i class="bi bi-calendar-plus me-1"></i>Agendar cita</a>
+        <a class="btn btn-primary" href="/admin/pacientes?new=1"><i class="bi bi-person-plus me-1"></i>Nuevo paciente</a>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4" id="kpis">
+      <div class="col-6 col-lg-3"><div class="card kpi placeholder-glow"><span class="placeholder col-8"></span><span class="placeholder col-4 mt-2" style="height:2rem"></span></div></div>
+      <div class="col-6 col-lg-3"><div class="card kpi placeholder-glow"><span class="placeholder col-8"></span><span class="placeholder col-4 mt-2" style="height:2rem"></span></div></div>
+      <div class="col-6 col-lg-3"><div class="card kpi placeholder-glow"><span class="placeholder col-8"></span><span class="placeholder col-4 mt-2" style="height:2rem"></span></div></div>
+      <div class="col-6 col-lg-3"><div class="card kpi placeholder-glow"><span class="placeholder col-8"></span><span class="placeholder col-4 mt-2" style="height:2rem"></span></div></div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center py-3">
+            <span><i class="bi bi-clock me-2"></i>Agenda de hoy</span>
+            <a href="/admin/citas" class="small">Ver agenda</a>
+          </div>
+          <div class="list-group list-group-flush" id="todayList"></div>
+        </div>
+      </div>
+      <div class="col-lg-5 d-flex flex-column gap-3">
+        <div class="card">
+          <div class="card-header py-3"><i class="bi bi-calendar-week me-2"></i>Próximos 7 días</div>
+          <div class="list-group list-group-flush" id="upcomingList"></div>
+        </div>
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center py-3">
+            <span><i class="bi bi-person-plus me-2"></i>Pacientes recientes</span>
+            <a href="/admin/pacientes" class="small">Ver todos</a>
+          </div>
+          <div class="list-group list-group-flush" id="recentList"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script>
+    (async () => {
+      const me = await App.init('inicio');
+      if (!me) return;
+      const { esc } = App;
+      const $ = (id) => document.getElementById(id);
+
+      const h = new Date().getHours();
+      const hello = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+      $('greeting').textContent = `${hello}${me.name ? ', ' + me.name.split(' ')[0] : ''}`;
+
+      let d;
+      try {
+        d = await App.api('/dashboard');
+      } catch (err) {
+        App.fail(err);
+        return;
+      }
+      $('todayLabel').textContent = `${me.session.businessName} · ${App.fmtDate(d.today, { weekday: true })}`;
+
+      const k = d.kpis;
+      const p = d.progress || {};
+      const cards = [
+        ['bi-people', 'Pacientes activos', k.active_patients, `+${k.new_patients_month} este mes`],
+        ['bi-calendar-check', 'Citas hoy', k.appts_today, `${k.appts_week} en los próximos 7 días`],
+        ['bi-clipboard2-pulse', 'Consultas del mes', k.consultations_month, k.no_show_month ? `${k.no_show_month} inasistencias` : 'Sin inasistencias'],
+        ['bi-graph-down-arrow', 'Peso perdido (total)', p.kg_total ? `${App.fmtNum(p.kg_total)} kg` : '—',
+          p.tracked ? `${p.improving} de ${p.tracked} pacientes bajando` : 'Requiere 2+ consultas'],
+      ];
+      $('kpis').innerHTML = cards.map(([icon, label, value, sub]) => `
+        <div class="col-6 col-lg-3"><div class="card kpi h-100">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="kpi-label">${label}</div><i class="bi ${icon} kpi-icon"></i>
+          </div>
+          <div class="kpi-value mt-1">${esc(value)}</div>
+          <div class="small text-body-secondary mt-1">${esc(sub)}</div>
+        </div></div>`).join('');
+
+      const emptyRow = (msg) => `<div class="empty small">${msg}</div>`;
+      const personRow = (x, right, href) => `
+        <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2" href="${href}">
+          <span class="avatar">${esc(App.initials(x))}</span>
+          <span class="flex-grow-1 text-truncate">${esc(App.fullName(x))}</span>${right}</a>`;
+
+      $('todayList').innerHTML = d.todayAppointments.length
+        ? d.todayAppointments.map((a) => `
+            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" href="/admin/paciente?id=${esc(a.patient_id)}">
+              <span class="appt-time">${App.fmtTime(a.starts_at)}</span>
+              <span class="avatar">${esc(App.initials(a))}</span>
+              <span class="flex-grow-1">
+                <span class="d-block fw-medium">${esc(App.fullName(a))}</span>
+                <span class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min</span>
+              </span>
+              ${App.statusBadge(a.status)}
+            </a>`).join('')
+        : emptyRow('<i class="bi bi-cup-hot d-block fs-3 mb-1"></i>No hay citas para hoy');
+
+      $('upcomingList').innerHTML = d.upcoming.length
+        ? d.upcoming.map((a) => personRow(a, `<span class="small text-body-secondary text-nowrap">${App.fmtDate(a.starts_at, { weekday: true }).split(' ').slice(0, 3).join(' ')} · ${App.fmtTime(a.starts_at)}</span>`, `/admin/paciente?id=${esc(a.patient_id)}`)).join('')
+        : emptyRow('Sin citas programadas');
+
+      $('recentList').innerHTML = d.recentPatients.length
+        ? d.recentPatients.map((x) => personRow(x, `<span class="small text-body-secondary">${App.fmtDate(x.created_at)}</span>`, `/admin/paciente?id=${esc(x.id)}`)).join('')
+        : emptyRow('Aún no hay pacientes');
+    })();
+  </script>
+</body>
+</html>

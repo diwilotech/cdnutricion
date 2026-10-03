@@ -1,0 +1,8 @@
+# Copia este archivo como .dev.vars para desarrollo local.
+# Sin ACCESS_AUD, el Worker usa DEV_EMAIL como identidad (solo local).
+DEV_EMAIL=tu-correo@ejemplo.com
+SUPERADMIN_EMAILS=tu-correo@ejemplo.com
+# SMTP_USER=
+# SMTP_PASS=
+# EVOLUTION_URL=
+# EVOLUTION_KEY=

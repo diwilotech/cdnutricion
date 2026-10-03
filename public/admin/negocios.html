@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Negocios · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+</head>
+<body>
+  <main class="container-xl py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <div>
+        <h1 class="page-title">Negocios</h1>
+        <div class="small text-body-secondary">Administración de la plataforma (tenants)</div>
+      </div>
+      <button class="btn btn-primary" id="newBtn"><i class="bi bi-plus-lg me-1"></i>Nuevo negocio</button>
+    </div>
+
+    <div class="row g-3 mb-3" id="totals"></div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="small text-body-secondary">
+            <tr><th>Negocio</th><th class="hide-xs">Propietarios</th><th class="num">Pacientes</th><th class="num hide-xs">Equipo</th><th class="hide-xs">Última consulta</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script>
+    (async () => {
+      const me = await App.init('negocios', { needsBusiness: false });
+      if (!me) return;
+      const { esc } = App;
+      const $ = (id) => document.getElementById(id);
+      let items = [];
+
+      async function load() {
+        try {
+          items = (await App.api('/super/businesses')).items;
+        } catch (err) { App.fail(err); return; }
+        const active = items.filter((b) => b.status === 'active').length;
+        const patients = items.reduce((s, b) => s + b.patients, 0);
+        $('totals').innerHTML = [['Negocios activos', active], ['Suspendidos', items.length - active], ['Pacientes en total', patients]]
+          .map(([l, v]) => `<div class="col-4"><div class="card kpi"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div></div>`).join('');
+        $('rows').innerHTML = items.length
+          ? items.map((b) => `
+              <tr>
+                <td><div class="fw-medium">${esc(b.name)}</div><div class="small text-body-secondary">${esc(b.slug)} · ${esc(b.timezone)}</div></td>
+                <td class="hide-xs small">${esc(b.owners || '—')}</td>
+                <td class="num">${b.patients}</td>
+                <td class="num hide-xs">${b.members}</td>
+                <td class="hide-xs">${App.fmtDate(b.last_activity)}</td>
+                <td>${b.status === 'active' ? '<span class="badge text-bg-success">Activo</span>' : '<span class="badge text-bg-secondary">Suspendido</span>'}</td>
+                <td class="text-end text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-enter="${esc(b.id)}" title="Entrar al negocio"><i class="bi bi-box-arrow-in-right"></i></button>
+                  <button class="btn btn-sm btn-outline-secondary" data-edit="${esc(b.id)}" title="Editar"><i class="bi bi-pencil"></i></button>
+                </td>
+              </tr>`).join('')
+          : '<tr><td colspan="7" class="empty">Aún no hay negocios</td></tr>';
+      }
+
+      function dialog(b) {
+        const editing = !!b;
+        const { el, hide } = App.modal(`
+          <form novalidate>
+            <div class="modal-header"><h5 class="modal-title">${editing ? 'Editar negocio' : 'Nuevo negocio'}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+            <div class="modal-body"><div class="row g-3">
+              <div class="col-12"><label class="form-label">Nombre *</label><input name="name" class="form-control" required maxlength="120"></div>
+              ${editing ? '' : '<div class="col-12"><label class="form-label">Identificador</label><input name="slug" class="form-control" maxlength="50" placeholder="se genera del nombre"></div>'}
+              <div class="col-sm-6"><label class="form-label">Correo</label><input name="email" type="email" class="form-control"></div>
+              <div class="col-sm-6"><label class="form-label">Teléfono</label><input name="phone" class="form-control" maxlength="30"></div>
+              <div class="col-sm-6"><label class="form-label">Zona horaria</label><input name="timezone" class="form-control" value="America/Bogota"></div>
+              ${editing
+                ? `<div class="col-sm-6"><label class="form-label">Estado</label><select name="status" class="form-select">
+                     <option value="active">Activo</option><option value="suspended">Suspendido</option></select></div>
+                   <div class="col-12"><label class="form-label">Agregar propietario (correo)</label><input name="owner_email" type="email" class="form-control"></div>`
+                : `<div class="col-sm-6"><label class="form-label">Nombre del propietario</label><input name="owner_name" class="form-control" maxlength="100"></div>
+                   <div class="col-12"><label class="form-label">Correo del propietario</label><input name="owner_email" type="email" class="form-control">
+                     <div class="form-text">Recuerda permitir este correo en Cloudflare Access.</div></div>`}
+            </div></div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">Guardar</button></div>
+          </form>`);
+        const form = el.querySelector('form');
+        if (editing) App.fillForm(form, b);
+        App.onSubmit(form, async (d) => {
+          if (editing) {
+            await App.api(`/super/businesses/${b.id}`, { method: 'PUT', body: d });
+            if (d.owner_email) await App.api(`/super/businesses/${b.id}/owners`, { method: 'POST', body: { email: d.owner_email } });
+          } else {
+            await App.api('/super/businesses', { method: 'POST', body: d });
+          }
+          hide();
+          App.toast(editing ? 'Negocio actualizado' : 'Negocio creado');
+          load();
+        });
+      }
+
+      $('rows').addEventListener('click', async (ev) => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        if (b.dataset.edit) dialog(items.find((x) => x.id === b.dataset.edit));
+        if (b.dataset.enter) {
+          try {
+            await App.api('/auth/business', { method: 'POST', body: { businessId: b.dataset.enter } });
+            location.href = '/admin/';
+          } catch (err) { App.fail(err); }
+        }
+      });
+      $('newBtn').onclick = () => dialog(null);
+      load();
+    })();
+  </script>
+</body>
+</html>

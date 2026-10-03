@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ingresar · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+</head>
+<body class="d-flex align-items-center justify-content-center p-3">
+  <main class="card login-card w-100">
+    <div class="card-body p-4">
+      <div class="text-center mb-4">
+        <div class="avatar mx-auto mb-2" style="width:3rem;height:3rem;font-size:1.4rem"><i class="bi bi-heart-pulse"></i></div>
+        <h1 class="h5 mb-1">CD Nutrición</h1>
+        <p class="text-body-secondary small mb-0" id="who">Verificando acceso…</p>
+      </div>
+
+      <form id="pinForm" class="d-none" novalidate>
+        <div id="nameField" class="mb-3 d-none">
+          <label class="form-label" for="name">Tu nombre</label>
+          <input id="name" name="name" class="form-control" maxlength="100" autocomplete="name">
+        </div>
+        <label class="form-label" for="pin" id="pinLabel">PIN</label>
+        <input id="pin" name="pin" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8"
+               class="form-control pin-input mb-2" required autocomplete="current-password">
+        <div id="confirmField" class="d-none">
+          <label class="form-label" for="pin2">Confirma el PIN</label>
+          <input id="pin2" name="pin2" type="password" inputmode="numeric" pattern="\d{4,8}" maxlength="8"
+                 class="form-control pin-input mb-2" autocomplete="new-password">
+        </div>
+        <div class="invalid-feedback d-block small mb-2" id="err"></div>
+        <button type="submit" class="btn btn-primary w-100 mt-2">Entrar</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script>
+    (async () => {
+      const $ = (id) => document.getElementById(id);
+      const next = App.param('next');
+      const target = next && next.startsWith('/admin') ? next : '/admin/';
+      let me;
+      try {
+        me = await App.api('/auth/me');
+      } catch (err) {
+        $('who').textContent = err.message;
+        return;
+      }
+      if (me.session) { location.replace(target); return; }
+
+      const firstTime = !me.hasPin;
+      $('who').textContent = me.email;
+      $('pinForm').classList.remove('d-none');
+      if (firstTime) {
+        $('nameField').classList.remove('d-none');
+        $('confirmField').classList.remove('d-none');
+        $('pin2').required = true;
+        $('pinLabel').textContent = 'Crea tu PIN (4 a 8 dígitos)';
+        $('name').value = me.name || '';
+        $('name').focus();
+      } else {
+        $('pin').focus();
+      }
+
+      App.onSubmit($('pinForm'), async (d) => {
+        $('err').textContent = '';
+        if (firstTime && d.pin !== d.pin2) { $('err').textContent = 'Los PIN no coinciden'; return; }
+        try {
+          await App.api('/auth/pin', { method: 'POST', body: { pin: d.pin, name: d.name } });
+          location.replace(target);
+        } catch (err) {
+          $('err').textContent = err.message;
+          $('pin').value = '';
+          $('pin').focus();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Citas · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+  <style>
+    .day-head { font-weight: 600; text-transform: capitalize; }
+    .day-head.today { color: var(--cdn-green); }
+  </style>
+</head>
+<body>
+  <main class="container-xl py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <h1 class="page-title">Agenda</h1>
+      <button class="btn btn-primary" id="newBtn"><i class="bi bi-calendar-plus me-1"></i>Agendar cita</button>
+    </div>
+
+    <div class="card mb-3"><div class="card-body d-flex flex-wrap align-items-center gap-2">
+      <div class="btn-group">
+        <button class="btn btn-outline-secondary" id="prev" aria-label="Semana anterior"><i class="bi bi-chevron-left"></i></button>
+        <button class="btn btn-outline-secondary" id="todayBtn">Hoy</button>
+        <button class="btn btn-outline-secondary" id="next" aria-label="Semana siguiente"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      <span class="fw-semibold ms-2" id="range"></span>
+      <div class="ms-auto form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="showAll">
+        <label class="form-check-label small" for="showAll">Mostrar canceladas</label>
+      </div>
+    </div></div>
+
+    <div id="days" class="d-flex flex-column gap-3"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script src="/admin/assets/forms.js"></script>
+  <script>
+    (async () => {
+      if (!(await App.init('citas'))) return;
+      const { esc } = App;
+      const $ = (id) => document.getElementById(id);
+      const today = App.todayLocal();
+      // La semana empieza el lunes.
+      const monday = (iso) => {
+        const dow = new Date(iso + 'T00:00:00Z').getUTCDay();
+        return App.addDays(iso, dow === 0 ? -6 : 1 - dow);
+      };
+      let from = monday(App.param('from') || today);
+      let items = [];
+
+      async function load() {
+        const to = App.addDays(from, 6);
+        $('range').textContent = `${App.fmtDate(from)} – ${App.fmtDate(to)}`;
+        try {
+          items = (await App.api(`/appointments?from=${from}&to=${to}`)).items;
+        } catch (err) { App.fail(err); return; }
+        render();
+      }
+
+      function render() {
+        const showAll = $('showAll').checked;
+        const html = [];
+        for (let i = 0; i < 7; i++) {
+          const day = App.addDays(from, i);
+          const list = items.filter((a) => a.starts_at.startsWith(day) && (showAll || a.status !== 'cancelled'));
+          if (!list.length && day !== today) continue;
+          html.push(`
+            <div class="card">
+              <div class="card-header py-2 d-flex justify-content-between">
+                <span class="day-head ${day === today ? 'today' : ''}">${App.fmtDate(day, { weekday: true })}${day === today ? ' · hoy' : ''}</span>
+                <span class="small text-body-secondary">${list.length} cita${list.length === 1 ? '' : 's'}</span>
+              </div>
+              <div class="list-group list-group-flush">
+                ${list.length ? list.map((a) => `
+                  <div class="list-group-item d-flex flex-wrap align-items-center gap-3 py-3">
+                    <span class="appt-time">${App.fmtTime(a.starts_at)}</span>
+                    <a href="/admin/paciente?id=${esc(a.patient_id)}" class="d-flex align-items-center gap-2 flex-grow-1 text-decoration-none text-body">
+                      <span class="avatar">${esc(App.initials(a))}</span>
+                      <span><span class="d-block fw-medium">${esc(App.fullName(a))}</span>
+                      <span class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min${a.notes ? ' · ' + esc(a.notes) : ''}</span></span>
+                    </a>
+                    ${App.statusBadge(a.status)}
+                    <div class="btn-group btn-group-sm">
+                      ${a.status === 'scheduled' ? `
+                        <button class="btn btn-outline-success" data-status="done" data-id="${esc(a.id)}" title="Marcar atendida"><i class="bi bi-check2"></i></button>
+                        <button class="btn btn-outline-danger" data-status="no_show" data-id="${esc(a.id)}" title="No asistió"><i class="bi bi-person-x"></i></button>
+                        <button class="btn btn-outline-secondary" data-remind="${esc(a.id)}" title="Recordatorio WhatsApp${a.reminded_at ? ' (ya enviado)' : ''}"><i class="bi bi-whatsapp"></i></button>` : ''}
+                      <button class="btn btn-outline-secondary" data-edit="${esc(a.id)}" title="Editar"><i class="bi bi-pencil"></i></button>
+                    </div>
+                  </div>`).join('')
+                  : '<div class="empty small">Sin citas</div>'}
+              </div>
+            </div>`);
+        }
+        $('days').innerHTML = html.join('') || '<div class="card"><div class="empty">No hay citas esta semana</div></div>';
+      }
+
+      $('days').addEventListener('click', async (ev) => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        const a = items.find((x) => x.id === (b.dataset.id || b.dataset.edit || b.dataset.remind));
+        try {
+          if (b.dataset.status) {
+            await App.api(`/appointments/${a.id}`, { method: 'PUT', body: { ...a, status: b.dataset.status } });
+            App.toast(b.dataset.status === 'done' ? 'Cita marcada como atendida' : 'Marcada como inasistencia');
+            load();
+          } else if (b.dataset.edit) {
+            Forms.appointmentDialog(a, load);
+          } else if (b.dataset.remind) {
+            b.disabled = true;
+            await App.api(`/appointments/${a.id}/remind`, { method: 'POST' });
+            App.toast('Recordatorio enviado');
+            load();
+          }
+        } catch (err) {
+          b.disabled = false;
+          App.fail(err);
+        }
+      });
+
+      $('prev').onclick = () => { from = App.addDays(from, -7); load(); };
+      $('next').onclick = () => { from = App.addDays(from, 7); load(); };
+      $('todayBtn').onclick = () => { from = monday(today); load(); };
+      $('showAll').onchange = render;
+
+      const openNew = () => Forms.appointmentDialog(null, load, { starts_at: `${today}T08:00` });
+      $('newBtn').onclick = openNew;
+      if (App.param('new')) openNew();
+
+      load();
+    })();
+  </script>
+</body>
+</html>

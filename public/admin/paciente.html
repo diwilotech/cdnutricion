@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paciente · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+  <style>
+    .spark { width: 100%; height: 120px; }
+    .spark path.line { fill: none; stroke: var(--cdn-green); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+    .spark circle { fill: var(--cdn-green); }
+    .spark text { fill: var(--bs-secondary-color); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .stat-label { font-size: .75rem; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .04em; }
+    .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <main class="container-xl py-4">
+    <a href="/admin/pacientes" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Pacientes</a>
+
+    <div class="card mt-2 mb-3"><div class="card-body" id="header">
+      <div class="placeholder-glow"><span class="placeholder col-4"></span></div>
+    </div></div>
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabConsultas" type="button"><i class="bi bi-clipboard2-pulse me-1"></i>Consultas</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCitas" type="button"><i class="bi bi-calendar-week me-1"></i>Citas</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabArchivos" type="button"><i class="bi bi-paperclip me-1"></i>Archivos</button></li>
+    </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="tabConsultas">
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="card h-100"><div class="card-header py-3">Evolución del peso</div>
+              <div class="card-body" id="chart"></div></div>
+          </div>
+          <div class="col-lg-8">
+            <div class="card">
+              <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <span>Historial de consultas</span>
+                <button class="btn btn-sm btn-primary" id="newConsultation"><i class="bi bi-plus-lg me-1"></i>Registrar consulta</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table mb-0">
+                  <thead class="small text-body-secondary"><tr><th>Fecha</th><th class="num">Peso</th><th class="num">Grasa</th><th class="num">Músculo</th><th class="hide-xs">Notas</th><th></th></tr></thead>
+                  <tbody id="consultations"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="tabCitas">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <span>Citas</span>
+            <button class="btn btn-sm btn-primary" id="newAppt"><i class="bi bi-calendar-plus me-1"></i>Agendar</button>
+          </div>
+          <div class="list-group list-group-flush" id="appointments"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane fade" id="tabArchivos">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center py-2 gap-2">
+            <span>Fotos y documentos</span>
+            <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-upload me-1"></i>Subir
+              <input type="file" id="fileInput" accept="image/*,application/pdf" hidden multiple></label>
+          </div>
+          <div class="list-group list-group-flush" id="files"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script src="/admin/assets/forms.js"></script>
+  <script>
+    (async () => {
+      if (!(await App.init('pacientes'))) return;
+      const { esc } = App;
+      const $ = (id) => document.getElementById(id);
+      const id = App.param('id');
+      if (!id) { location.href = '/admin/pacientes'; return; }
+      let data;
+
+      // Medidas extra (mismas claves que el prototipo Cuerpo Vivo).
+      const EXTRA = [
+        ['Composición', [['visceral', 'Grasa visceral', 'nivel'], ['agua', 'Agua corporal', '%'], ['osea', 'Masa ósea', 'kg'], ['edadMet', 'Edad metabólica', 'años']]],
+        ['Circunferencias (cm)', [['cintura', 'Cintura'], ['abdomen', 'Abdomen'], ['cadera', 'Cadera'], ['brazoR', 'Brazo relajado'], ['muslo', 'Muslo'], ['pantorrilla', 'Pantorrilla']]],
+        ['Pliegues (mm)', [['pTri', 'Tricipital'], ['pBi', 'Bicipital'], ['pSub', 'Subescapular'], ['pSupra', 'Suprailíaco'], ['pAbd', 'Abdominal']]],
+        ['Signos vitales', [['pas', 'Sistólica', 'mmHg'], ['pad', 'Diastólica', 'mmHg'], ['fc', 'Frec. cardíaca', 'lpm'], ['glu', 'Glucosa', 'mg/dL']]],
+      ];
+
+      async function load() {
+        try {
+          data = await App.api(`/patients/${id}`);
+        } catch (err) {
+          App.fail(err);
+          return;
+        }
+        renderHeader();
+        renderConsultations();
+        renderAppointments();
+        renderFiles();
+      }
+
+      function renderHeader() {
+        const p = data.patient;
+        document.title = `${App.fullName(p)} · CD Nutrición`;
+        const last = data.consultations[0];
+        const first = data.consultations[data.consultations.length - 1];
+        const delta = last && first && last !== first && last.weight_kg && first.weight_kg ? last.weight_kg - first.weight_kg : null;
+        const imc = last?.weight_kg && p.height_cm ? last.weight_kg / (p.height_cm / 100) ** 2 : null;
+        const phoneDigits = (p.phone || '').replace(/\D/g, '');
+        const wa = phoneDigits ? `https://wa.me/${phoneDigits.length === 10 ? '57' + phoneDigits : phoneDigits}` : null;
+        const stat = (label, value) => `<div class="col-6 col-md-3"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+
+        $('header').innerHTML = `
+          <div class="d-flex flex-wrap align-items-start gap-3">
+            <span class="avatar" style="width:3.25rem;height:3.25rem;font-size:1.1rem">${esc(App.initials(p))}</span>
+            <div class="flex-grow-1">
+              <h1 class="page-title">${esc(App.fullName(p))}
+                ${p.status === 'archived' ? '<span class="badge text-bg-secondary align-middle fs-6 ms-1">Archivado</span>' : ''}</h1>
+              <div class="text-body-secondary small">
+                ${[p.sex === 'F' ? 'Femenino' : p.sex === 'M' ? 'Masculino' : null,
+                   App.age(p.birth_date) !== null ? `${App.age(p.birth_date)} años` : null,
+                   p.doc_id ? `Doc. ${p.doc_id}` : null, p.phone, p.email].filter(Boolean).map(esc).join(' · ') || 'Sin datos de contacto'}
+              </div>
+              ${p.goal ? `<div class="mt-1"><i class="bi bi-bullseye me-1 text-success"></i>${esc(p.goal)}</div>` : ''}
+            </div>
+            <div class="d-flex gap-2">
+              ${wa ? `<a class="btn btn-outline-success" href="${wa}" target="_blank" rel="noopener" title="Abrir WhatsApp"><i class="bi bi-whatsapp"></i></a>` : ''}
+              <button class="btn btn-outline-primary" id="editBtn"><i class="bi bi-pencil me-1"></i>Editar</button>
+              ${['owner', 'admin'].includes(App.me.session.role) ? '<button class="btn btn-outline-danger" id="deleteBtn" title="Eliminar paciente"><i class="bi bi-trash"></i></button>' : ''}
+            </div>
+          </div>
+          <div class="row g-3 mt-2 pt-3 border-top">
+            ${stat('Peso actual', last?.weight_kg ? App.fmtNum(last.weight_kg) + ' kg' : '—')}
+            ${stat('Cambio total', delta === null ? '—' : `<span class="${delta <= 0 ? 'text-success' : 'text-danger'}">${delta > 0 ? '+' : ''}${App.fmtNum(delta)} kg</span>`)}
+            ${stat('IMC', imc ? App.fmtNum(imc) : '—')}
+            ${stat('Grasa / Músculo', last ? `${App.fmtNum(last.fat_pct)}% / ${App.fmtNum(last.muscle_pct)}%` : '—')}
+          </div>
+          ${p.notes ? `<div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-sticky me-1"></i>${esc(p.notes)}</div>` : ''}`;
+
+        $('editBtn').onclick = () => Forms.patientDialog(p, load);
+        $('deleteBtn')?.addEventListener('click', async () => {
+          if (!(await App.confirmAction(`¿Eliminar a ${App.fullName(p)} con todas sus consultas, citas y archivos? Esta acción no se puede deshacer.`))) return;
+          try {
+            await App.api(`/patients/${id}`, { method: 'DELETE' });
+            location.href = '/admin/pacientes';
+          } catch (err) { App.fail(err); }
+        });
+      }
+
+      function renderChart() {
+        const pts = data.consultations.filter((c) => c.weight_kg).slice().reverse();
+        if (pts.length < 2) {
+          $('chart').innerHTML = '<div class="empty small">Registra al menos dos consultas con peso para ver la evolución.</div>';
+          return;
+        }
+        const W = 320, H = 120, P = 18;
+        const ys = pts.map((p) => p.weight_kg);
+        const min = Math.min(...ys), max = Math.max(...ys), span = max - min || 1;
+        const x = (i) => P + (i * (W - 2 * P)) / (pts.length - 1);
+        const y = (v) => P + ((max - v) * (H - 2 * P)) / span;
+        const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.weight_kg).toFixed(1)}`).join(' ');
+        $('chart').innerHTML = `
+          <svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peso de ${App.fmtNum(ys[0])} a ${App.fmtNum(ys[ys.length - 1])} kg">
+            <path class="line" d="${d}"/>
+            ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.weight_kg)}" r="3"><title>${App.fmtDate(p.date)}: ${App.fmtNum(p.weight_kg)} kg</title></circle>`).join('')}
+            <text x="${x(0)}" y="${y(ys[0]) - 8}" text-anchor="start">${App.fmtNum(ys[0])}</text>
+            <text x="${x(pts.length - 1)}" y="${y(ys[ys.length - 1]) - 8}" text-anchor="end">${App.fmtNum(ys[ys.length - 1])} kg</text>
+          </svg>
+          <div class="d-flex justify-content-between small text-body-secondary"><span>${App.fmtDate(pts[0].date)}</span><span>${App.fmtDate(pts[pts.length - 1].date)}</span></div>`;
+      }
+
+      function renderConsultations() {
+        renderChart();
+        $('consultations').innerHTML = data.consultations.length
+          ? data.consultations.map((c) => `
+              <tr>
+                <td class="text-nowrap">${App.fmtDate(c.date)}</td>
+                <td class="num">${c.weight_kg ? App.fmtNum(c.weight_kg) + ' kg' : '—'}</td>
+                <td class="num">${c.fat_pct ? App.fmtNum(c.fat_pct) + '%' : '—'}</td>
+                <td class="num">${c.muscle_pct ? App.fmtNum(c.muscle_pct) + '%' : '—'}</td>
+                <td class="hide-xs small text-body-secondary text-truncate" style="max-width:16rem">${esc(c.notes || '')}${Object.keys(c.measures).length ? ` <span class="badge text-bg-light">+${Object.keys(c.measures).length} medidas</span>` : ''}</td>
+                <td class="text-end"><button class="btn btn-sm btn-link text-danger" data-del-consultation="${esc(c.id)}" title="Eliminar"><i class="bi bi-trash"></i></button></td>
+              </tr>`).join('')
+          : '<tr><td colspan="6" class="empty">Sin consultas registradas</td></tr>';
+      }
+
+      function renderAppointments() {
+        $('appointments').innerHTML = data.appointments.length
+          ? data.appointments.map((a) => `
+              <div class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3">
+                <div class="flex-grow-1">
+                  <div class="fw-medium">${App.fmtDateTime(a.starts_at)}</div>
+                  <div class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min${a.reminded_at ? ' · recordatorio enviado' : ''}${a.notes ? ' · ' + esc(a.notes) : ''}</div>
+                </div>
+                ${App.statusBadge(a.status)}
+                ${a.status === 'scheduled' ? `<button class="btn btn-sm btn-outline-success" data-remind="${esc(a.id)}" title="Enviar recordatorio por WhatsApp"><i class="bi bi-whatsapp"></i></button>` : ''}
+                <button class="btn btn-sm btn-outline-secondary" data-edit-appt="${esc(a.id)}"><i class="bi bi-pencil"></i></button>
+              </div>`).join('')
+          : '<div class="empty">Sin citas</div>';
+      }
+
+      function renderFiles() {
+        const icon = (t) => (t?.startsWith('image/') ? 'bi-file-earmark-image' : 'bi-file-earmark-pdf');
+        $('files').innerHTML = data.files.length
+          ? data.files.map((f) => `
+              <div class="list-group-item d-flex align-items-center gap-3">
+                <i class="bi ${icon(f.content_type)} fs-4 text-body-secondary"></i>
+                <a class="flex-grow-1 text-truncate" href="/api/admin/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>
+                <span class="small text-body-secondary text-nowrap hide-xs">${(f.size / 1024 / 1024).toFixed(1)} MB · ${App.fmtDate(f.created_at)}</span>
+                <button class="btn btn-sm btn-link text-danger" data-del-file="${esc(f.id)}" title="Eliminar"><i class="bi bi-trash"></i></button>
+              </div>`).join('')
+          : '<div class="empty">Sin archivos. Sube fotos de progreso, exámenes o planes en PDF.</div>';
+      }
+
+      // ---------- registrar consulta ----------
+      $('newConsultation').addEventListener('click', () => {
+        const extra = EXTRA.map(([group, fields]) => `
+          <div class="col-12"><div class="small fw-semibold text-body-secondary mt-2">${group}</div></div>
+          ${fields.map(([k, label, unit]) => `<div class="col-6 col-sm-3"><label class="form-label small mb-1">${label}${unit ? ` <span class="text-body-secondary">(${unit})</span>` : ''}</label>
+            <input name="m_${k}" type="number" step="0.1" min="0" class="form-control form-control-sm"></div>`).join('')}`).join('');
+        const { el, hide } = App.modal(`
+          <form novalidate>
+            <div class="modal-header"><h5 class="modal-title">Registrar consulta</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-sm-6"><label class="form-label">Fecha *</label><input name="date" type="date" class="form-control" required value="${App.todayLocal()}"></div>
+                <div class="col-sm-6"><label class="form-label">Peso (kg)</label><input name="weight_kg" type="number" step="0.1" min="1" max="400" class="form-control"></div>
+                <div class="col-sm-6"><label class="form-label">Grasa corporal (%)</label><input name="fat_pct" type="number" step="0.1" min="1" max="80" class="form-control"></div>
+                <div class="col-sm-6"><label class="form-label">Músculo esquelético (%)</label><input name="muscle_pct" type="number" step="0.1" min="1" max="80" class="form-control"></div>
+                <div class="col-12">
+                  <button class="btn btn-sm btn-link px-0" type="button" data-bs-toggle="collapse" data-bs-target="#moreMeasures"><i class="bi bi-plus-circle me-1"></i>Más medidas</button>
+                  <div class="collapse" id="moreMeasures"><div class="row g-2">${extra}</div></div>
+                </div>
+                <div class="col-12"><label class="form-label">Notas / recomendaciones</label><textarea name="notes" class="form-control" rows="3" maxlength="4000"></textarea></div>
+              </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">Guardar consulta</button></div>
+          </form>`);
+        el.querySelector('.modal-dialog').classList.add('modal-lg');
+        App.onSubmit(el.querySelector('form'), async (d) => {
+          const measures = {};
+          for (const [k, v] of Object.entries(d)) if (k.startsWith('m_') && v !== '') measures[k.slice(2)] = Number(v);
+          await App.api(`/patients/${id}/consultations`, {
+            method: 'POST',
+            body: { date: d.date, weight_kg: d.weight_kg, fat_pct: d.fat_pct, muscle_pct: d.muscle_pct, notes: d.notes, measures },
+          });
+          hide();
+          App.toast('Consulta registrada');
+          load();
+        });
+      });
+
+      $('newAppt').addEventListener('click', () =>
+        Forms.appointmentDialog(null, load, { patient_id: id, first_name: data.patient.first_name, last_name: data.patient.last_name }));
+
+      // ---------- acciones en listas ----------
+      document.querySelector('main').addEventListener('click', async (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        try {
+          if (t.dataset.delConsultation) {
+            if (!(await App.confirmAction('¿Eliminar esta consulta?'))) return;
+            await App.api(`/consultations/${t.dataset.delConsultation}`, { method: 'DELETE' });
+            App.toast('Consulta eliminada');
+            load();
+          } else if (t.dataset.delFile) {
+            if (!(await App.confirmAction('¿Eliminar este archivo?'))) return;
+            await App.api(`/files/${t.dataset.delFile}`, { method: 'DELETE' });
+            App.toast('Archivo eliminado');
+            load();
+          } else if (t.dataset.editAppt) {
+            const a = data.appointments.find((x) => x.id === t.dataset.editAppt);
+            Forms.appointmentDialog({ ...a, patient_id: id, first_name: data.patient.first_name, last_name: data.patient.last_name }, load);
+          } else if (t.dataset.remind) {
+            t.disabled = true;
+            await App.api(`/appointments/${t.dataset.remind}/remind`, { method: 'POST' });
+            App.toast('Recordatorio enviado por WhatsApp');
+            load();
+          }
+        } catch (err) {
+          t.disabled = false;
+          App.fail(err);
+        }
+      });
+
+      $('fileInput').addEventListener('change', async (ev) => {
+        for (const file of ev.target.files) {
+          const form = new FormData();
+          form.append('file', file);
+          try {
+            await App.api(`/patients/${id}/files`, { method: 'POST', form });
+            App.toast(`${file.name} subido`);
+          } catch (err) { App.fail(err); }
+        }
+        ev.target.value = '';
+        load();
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>
