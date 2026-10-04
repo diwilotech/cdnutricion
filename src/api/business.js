@@ -99,6 +99,16 @@ export function routes(r) {
     const m = await tenantDb(c).first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId);
     if (!m) throw new HttpError(404, 'Miembro no encontrado');
     if (m.role === 'owner' && c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede hacer esto');
+    // Un link de restablecimiento da acceso a todos los consultorios de la persona: si ya tiene
+    // contraseña y trabaja en otro consultorio, solo Diwilo Web puede generarlo.
+    const u = await globalDb(c.env).first(
+      `SELECT u.pin_hash, (SELECT COUNT(*) FROM memberships x WHERE x.user_id = u.id AND x.business_id <> ?) AS others
+         FROM users u WHERE u.id = ?`,
+      c.businessId, c.params.userId,
+    );
+    if (u.pin_hash && u.others > 0) {
+      throw new HttpError(403, 'Esta persona también trabaja en otro consultorio. Para restablecer su contraseña, pídelo a Diwilo.');
+    }
     return json({ ok: true, inviteUrl: c.url.origin + invitePath(await createInvite(c.env, c.params.userId)) });
   });
 
