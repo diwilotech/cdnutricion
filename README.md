@@ -61,11 +61,16 @@ Al abrir un paciente (desde Pacientes, Citas o Inicio) se abre `/admin/cuerpo?id
 estimación antropométrica, salud (exámenes, riesgos, lesiones, medicamentos), evolución y plan de alimentación.
 La nutricionista puede cambiar a la vista *Paciente* para ver exactamente lo que ve el paciente.
 
-Con **Vista del paciente** se genera un enlace privado `/<slug>/p/#<token>` (se guarda solo su SHA-256; crear uno nuevo
-desactiva el anterior). El paciente ve su seguimiento sin usuario ni contraseña y puede marcar comidas, agua y metas.
+Con **Vista del paciente** se genera un enlace privado `/<slug>/p/#<token>` (el `id` es su SHA-256; el token también
+se guarda para reusarlo en el QR y al volver a compartir; crear uno nuevo desactiva el anterior). El paciente ve su seguimiento sin usuario ni contraseña y puede marcar comidas, agua y metas.
 El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`.
 
 `/p/`, `/cv/` y `/api/p/` son públicos (el token protege los datos).
+
+**Imprimir plan** guarda una copia fija del plan vigente en `patient_plans` (con las recomendaciones y el peso del momento;
+si nada cambió desde la última, la reusa) y abre `/admin/plan?v=<id>`: hoja carta para imprimir o guardar en PDF, con las
+comidas, metas, recomendaciones, lo que debe evitar y un QR pequeño al seguimiento del paciente; al reverso, la lista de
+intercambios. En la Ficha, **Planes entregados** lista el historial para reimprimir o volver a un plan anterior.
 
 ### Roles
 

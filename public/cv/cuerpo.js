@@ -1126,5 +1126,5 @@ SAVERS = [
 ].filter(Boolean);
 ['input', 'change', 'click'].forEach(ev => $('[data-panel="plan"]').addEventListener(ev, () => setTimeout(persistAll)));
 // Controlador para la página que carga Cuerpo Vivo (vista previa del paciente, pestañas).
-return { setRol, setTab, toast, get rol(){ return S.rol; }, get tab(){ return S.tab; } };
+return { setRol, setTab, toast, planDoc, get rol(){ return S.rol; }, get tab(){ return S.tab; } };
 } };

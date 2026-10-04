@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Plan de alimentación · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+  <style>
+    /* Hoja carta: frente (comidas, metas, recomendaciones, QR) y reverso (lista de intercambios).
+       Pensada para imprimir en blanco y negro: los estados se distinguen con símbolos, no solo con color. */
+    @page { size: letter; margin: 11mm 12mm; }
+    .tools { max-width: 216mm; margin: 0 auto; }
+    .sheets { padding-bottom: 32px; }
+    .sheet {
+      --ink: #1d2327; --soft: #5b6670; --line: #d5dbe0; --tint: #eef6f8; --brand: #1388A5;
+      width: 100%; max-width: 216mm; min-height: 279mm; margin: 16px auto; padding: 11mm 12mm;
+      background: #fff; color: var(--ink); box-shadow: 0 2px 14px rgba(0,0,0,.12); border-radius: 4px;
+      font-size: 10pt; line-height: 1.35; display: flex; flex-direction: column;
+    }
+    .sheet h1 { font-size: 17pt; font-weight: 800; margin: 0; color: var(--brand); letter-spacing: -.01em; }
+    .sheet h2 { font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 5px; color: var(--brand); }
+    .sh-head { display: flex; gap: 12px; align-items: center; padding-bottom: 8px; border-bottom: 2px solid var(--brand); }
+    .sh-logo { width: 15mm; height: 15mm; border-radius: 50%; object-fit: cover; flex: none; }
+    .sh-org { flex: 1; min-width: 0; }
+    .sh-org b { display: block; font-size: 12pt; }
+    .sh-org span { color: var(--soft); font-size: 9pt; }
+    .sh-title { text-align: right; }
+    .sh-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 7px 0; color: var(--soft); font-size: 9.5pt; border-bottom: 1px solid var(--line); }
+    .sh-meta b { color: var(--ink); }
+    .meals { width: 100%; border-collapse: collapse; margin: 8px 0 10px; }
+    .meals th { width: 30mm; text-align: left; vertical-align: top; padding: 6px 8px 6px 0; font-size: 10.5pt; }
+    .meals th small { display: block; font-weight: 400; color: var(--soft); font-size: 9pt; }
+    .meals td { padding: 6px 0; vertical-align: top; }
+    .meals tr + tr > * { border-top: 1px solid var(--line); }
+    .comp { display: grid; grid-template-columns: 25mm 1fr; gap: 6px; padding: 1px 0; }
+    .comp > b { font-weight: 700; }
+    .two { display: grid; grid-template-columns: 1fr 1.35fr; gap: 14px; margin-top: 2px; }
+    .box { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+    .box ul { margin: 0; padding-left: 16px; }
+    .box li + li { margin-top: 3px; }
+    .goal { display: flex; justify-content: space-between; gap: 8px; }
+    .goal + .goal { margin-top: 4px; }
+    .goal span { color: var(--soft); text-align: right; }
+    .avoid { margin-top: 10px; padding: 6px 10px; border-left: 3px solid var(--ink); background: var(--tint); }
+    .sh-foot { margin-top: auto; padding-top: 10px; display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--line); font-size: 9pt; color: var(--soft); }
+    .sh-foot .qr { width: 22mm; height: 22mm; flex: none; }
+    .sh-foot .qr svg { width: 100%; height: 100%; display: block; }
+    .sh-foot b { color: var(--ink); }
+    .sh-sign { margin-left: auto; text-align: center; min-width: 52mm; }
+    .sh-sign hr { margin: 18px 0 3px; border-top: 1px solid var(--ink); opacity: 1; }
+    /* Reverso */
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 9pt; color: var(--soft); margin: 6px 0 8px; }
+    .xgrid { columns: 3; column-gap: 8mm; }
+    .xg { break-inside: avoid; margin-bottom: 8px; }
+    .xg h3 { font-size: 10pt; font-weight: 800; margin: 0; padding-bottom: 2px; border-bottom: 1px solid var(--ink); }
+    .xg .por { font-size: 8.5pt; color: var(--soft); margin: 2px 0 3px; }
+    .xr { font-size: 9pt; padding: 1px 0; }
+    .xr .q { color: var(--soft); }
+    .pref { font-weight: 700; }
+    .lim { font-style: italic; }
+    .hide { display: none !important; }
+    @media (max-width: 640px) {
+      .sheet { padding: 16px; min-height: 0; font-size: 9.5pt; }
+      .two { grid-template-columns: 1fr; }
+      .xgrid { columns: 1; }
+      .meals th { width: 24mm; }
+      .comp { grid-template-columns: 1fr; gap: 0; }
+    }
+    @media print {
+      body { background: #fff !important; }
+      .navbar-cdn, .bottom-nav, .tools, .cdn-toast-wrap { display: none !important; }
+      .sheets { padding: 0; }
+      .sheet { box-shadow: none; border-radius: 0; margin: 0; padding: 0; max-width: none; min-height: 255mm; break-after: page; font-size: 10pt; }
+      .sheet:last-child { break-after: auto; }
+      .two { grid-template-columns: 1fr 1.35fr; }
+      .xgrid { columns: 3; }
+      .comp { grid-template-columns: 25mm 1fr; gap: 6px; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid px-3">
+    <div class="tools pt-3" id="tools" hidden>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <a class="btn btn-outline-secondary" id="back"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+        <h1 class="h5 m-0 me-auto">Plan para imprimir</h1>
+        <button class="btn btn-primary" id="print"><i class="bi bi-printer me-1"></i>Imprimir o guardar PDF</button>
+      </div>
+      <div class="alert alert-warning d-none flex-wrap gap-2 align-items-center py-2" id="oldBanner">
+        <i class="bi bi-clock-history"></i><span class="me-auto">Este es un plan anterior, entregado el <b id="oldDate"></b>.</span>
+        <button class="btn btn-sm btn-warning" id="restore">Volver a este plan</button>
+      </div>
+      <div class="d-flex flex-wrap gap-3 small">
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optQr" checked><label class="form-check-label" for="optQr">QR del seguimiento</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optRecs" checked><label class="form-check-label" for="optRecs">Recomendaciones</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optWeight"><label class="form-check-label" for="optWeight">Peso</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optBack" checked><label class="form-check-label" for="optBack">Lista de intercambios (reverso)</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optSign"><label class="form-check-label" for="optSign">Firma</label></div>
+      </div>
+      <div class="alert alert-info small py-2 mt-2 mb-0" id="qrHelp" hidden></div>
+    </div>
+    <div class="sheets" id="sheets"><div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div></div></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script>
+    (async () => {
+      const me = await App.init('pacientes', { bottomNav: false });
+      if (!me) return;
+      const { esc } = App;
+      const $ = (s) => document.getElementById(s);
+      const v = App.param('v');
+      let d;
+      try { d = await App.api(`/plans/${encodeURIComponent(v || '')}`); } catch (err) {
+        $('sheets').innerHTML = `<p class="text-center py-5">${esc(err.message)}</p>`;
+        return;
+      }
+      const P = d.patient || { first_name: 'Paciente' };
+      const plan = d.plan || {};
+      const patientUrl = `${App.base}/cuerpo?id=${encodeURIComponent(d.patient?.id || '')}&tab=plan`;
+      document.title = `Plan de ${App.fullName(P)} · ${App.fmtDate(d.created_at)}`;
+      $('back').href = patientUrl;
+      $('tools').hidden = false;
+
+      // Plan anterior: se puede volver a él (pasa a ser el plan vigente del paciente).
+      if (!d.latest) {
+        $('oldBanner').classList.replace('d-none', 'd-flex');
+        $('oldDate').textContent = App.fmtDate(d.created_at);
+        $('restore').onclick = async () => {
+          if (!(await App.confirmAction(`El plan actual de ${P.first_name} se reemplaza por este. ¿Continuar?`))) return;
+          try {
+            await App.api(`/patients/${d.patient.id}/profile`, { method: 'PUT', body: { plan } });
+            location.href = patientUrl;
+          } catch (err) { App.fail(err); }
+        };
+      }
+
+      // ---------- textos ----------
+      const num = (n) => Number(n).toLocaleString('es-CO', { maximumFractionDigits: 2 });
+      const MARK = { pref: '★ ', lim: '~ ', salud: '! ' };
+      function compText([k, lab, val, sel]) {
+        const foods = sel?.foods || [], n = sel?.n;
+        const por = n ? `${num(n)} ${n == 1 ? 'porción' : 'porciones'}` : '';
+        const main = por && foods.length ? `${por}: ${foods.join(', ')}` : foods.length ? foods.join(', ') : por && `${por}, a elección (ver lista)`;
+        return [main, val].filter(Boolean).join(' · ') || '—';
+      }
+      const all = (st) => (plan.inter || []).flatMap((g) => g.rows.flatMap((r) => r.it.filter((it) => (it[1] || '') === st).map((it) => it[0])));
+      const avoid = all('evitar'), limit = all('salud');
+      const agua = plan.agua || 2;
+
+      function front() {
+        const pro = d.professional;
+        const logo = d.business.logo || pro?.photo;
+        const meals = (plan.meals || []).map((m) => `
+          <tr><th>${esc(m.n)}${m.h ? `<small>${esc(m.h)}</small>` : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}</th>
+            <td>${m.c.map((c) => `<div class="comp"><b>${esc(c[1])}</b><span>${esc(compText(c))}</span></div>`).join('') || '—'}</td></tr>`).join('');
+        const goals = [
+          `<div class="goal"><b>Agua</b><span>${num(agua)} litros al día · ${Math.round(agua / 0.25)} vasos</span></div>`,
+          ...(plan.goals || []).map((g) => `<div class="goal"><b>${esc(g.n)}</b><span>${esc(g.d || `Máximo ${g.max}`)}</span></div>`),
+        ].join('');
+        const recs = d.recs.slice(0, 5);
+        return `<section class="sheet">
+          <header class="sh-head">
+            ${logo ? `<img class="sh-logo" src="${esc(logo)}" alt="">` : ''}
+            <div class="sh-org"><b>${esc(d.business.name)}</b>
+              <span>${esc([pro?.name, pro?.specialty].filter(Boolean).join(' · '))}</span></div>
+            <div class="sh-title"><h1>Plan de alimentación</h1></div>
+          </header>
+          <div class="sh-meta">
+            <span>Paciente: <b>${esc(App.fullName(P))}</b></span>
+            <span>Entregado: <b>${App.fmtDate(d.created_at)}</b></span>
+            ${d.nextAppointment ? `<span>Próxima cita: <b>${esc(App.fmtDateTime(d.nextAppointment))}</b></span>` : ''}
+            <span data-opt="weight">${d.weight_kg ? `Peso: <b>${App.fmtNum(d.weight_kg)} kg</b>` : ''}${P.goal ? ` · Objetivo: <b>${esc(P.goal)}</b>` : ''}</span>
+          </div>
+          <table class="meals"><tbody>${meals}</tbody></table>
+          <div class="two">
+            <div class="box"><h2>Metas</h2>${goals}</div>
+            <div class="box" data-opt="recs"><h2>Recomendaciones</h2>${recs.length ? `<ul>${recs.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '<span class="text-body-secondary">—</span>'}</div>
+          </div>
+          ${avoid.length || limit.length ? `<div class="avoid">${avoid.length ? `<b>Evita:</b> ${esc(avoid.join(', '))}.` : ''}${limit.length ? ` <b>Limita por tu salud:</b> ${esc(limit.join(', '))}.` : ''}</div>` : ''}
+          <footer class="sh-foot">
+            <div class="qr" data-opt="qr" id="qr"></div>
+            <div data-opt="qr"><b>Tu seguimiento en línea</b><br>Escanea para ver tu plan y registrar tus comidas y tu agua.<br>Es personal: no compartas este código.</div>
+            <div class="sh-sign">
+              <div data-opt="sign"><hr><b>${esc(pro?.name || '')}</b>${pro?.specialty ? `<br>${esc(pro.specialty)}` : ''}</div>
+              <div>${esc([pro?.phone || d.business.phone, d.business.email].filter(Boolean).join(' · '))}</div>
+            </div>
+          </footer>
+        </section>`;
+      }
+
+      function back() {
+        const groups = (plan.inter || []).map((g) => {
+          const rows = g.rows.map((r) => {
+            const items = r.it.filter((it) => it[1] !== 'evitar');
+            if (!items.length) return '';
+            return `<div class="xr"><span class="q">${esc(r.q)}:</span> ${items.map(([n, st = '']) => `<span class="${st}">${MARK[st] || ''}${esc(n)}</span>`).join(', ')}${r.note ? ` <span class="q">(${esc(r.note)})</span>` : ''}</div>`;
+          }).join('');
+          return rows ? `<div class="xg"><h3>${esc(g.n)}</h3><div class="por">${esc(g.por || '')}</div>${rows}</div>` : '';
+        }).join('');
+        return `<section class="sheet" data-opt="back">
+          <header class="sh-head"><div class="sh-org"><b>Lista de intercambios</b><span>${esc(App.fullName(P))} · ${App.fmtDate(d.created_at)}</span></div></header>
+          <p class="mt-2 mb-0">Cada alimento equivale a <b>1 porción</b> en la cantidad indicada. Cambia un alimento por otro del mismo grupo.</p>
+          <div class="legend"><span class="pref">★ Recomendado</span><span>Permitido</span><span class="lim">~ Con moderación</span><span>! Limitar por tu salud</span></div>
+          <div class="xgrid">${groups}</div>
+        </section>`;
+      }
+
+      $('sheets').innerHTML = front() + back();
+
+      // ---------- QR: el enlace privado del paciente ----------
+      function drawQr(url) {
+        const q = qrcode(0, 'M');
+        q.addData(url);
+        q.make();
+        $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+      }
+      let url = d.portalUrl;
+      function paintQr() {
+        const help = $('qrHelp');
+        help.hidden = true;
+        if (url) { drawQr(url); return; }
+        $('qr').innerHTML = '';
+        help.hidden = !$('optQr').checked;
+        help.innerHTML = `${d.portalActive
+          ? `${esc(P.first_name)} tiene un enlace antiguo que no se puede reimprimir. Crea uno nuevo para el QR (el anterior deja de funcionar).`
+          : `${esc(P.first_name)} aún no tiene enlace a su seguimiento. Créalo para incluir el QR.`}
+          <button class="btn btn-sm btn-primary ms-2" id="mkLink"><i class="bi bi-qr-code me-1"></i>Crear enlace</button>`;
+        $('mkLink').onclick = async () => {
+          try {
+            url = (await App.api(`/patients/${d.patient.id}/portal`, { method: 'POST' })).url;
+            paintQr(); apply();
+          } catch (err) { App.fail(err); }
+        };
+      }
+      paintQr();
+
+      // ---------- opciones de impresión (se recuerdan en este navegador) ----------
+      const OPTS = { qr: 'optQr', recs: 'optRecs', weight: 'optWeight', back: 'optBack', sign: 'optSign' };
+      try {
+        const saved = JSON.parse(localStorage.getItem('cdn.planPrint') || '{}');
+        for (const [k, idv] of Object.entries(OPTS)) if (k in saved) $(idv).checked = saved[k];
+      } catch { /* sin almacenamiento */ }
+      function apply() {
+        const state = {};
+        for (const [k, idv] of Object.entries(OPTS)) {
+          state[k] = $(idv).checked;
+          const off = !state[k] || (k === 'qr' && !url) || (k === 'weight' && !d.weight_kg && !P.goal);
+          document.querySelectorAll(`[data-opt="${k}"]`).forEach((el) => el.classList.toggle('hide', off));
+        }
+        $('qrHelp').hidden = url || !state.qr;
+        try { localStorage.setItem('cdn.planPrint', JSON.stringify(state)); } catch { /* sin almacenamiento */ }
+      }
+      Object.values(OPTS).forEach((idv) => $(idv).addEventListener('change', apply));
+      apply();
+      $('print').onclick = () => window.print();
+    })();
+  </script>
+</body>
+</html>

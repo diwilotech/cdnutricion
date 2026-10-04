@@ -73,10 +73,23 @@
 
       $('#cvBack').innerHTML = '<a class="cv-back" href="/admin/pacientes" aria-label="Volver a pacientes"><i class="bi bi-arrow-left"></i></a>';
       $('#cvActions').innerHTML = `
+        <button class="btn btn-outline-primary" id="btnPrint" title="Imprimir plan de alimentación"><i class="bi bi-printer"></i><span class="btn-label ms-1">Imprimir plan</span></button>
         <button class="btn btn-outline-primary" id="btnShare"><i class="bi bi-eye"></i><span class="btn-label ms-1">Vista del paciente</span></button>
         <button class="btn btn-primary" id="btnAgendar"><i class="bi bi-calendar-plus"></i><span class="btn-label ms-1">Agendar</span></button>`;
       $('#btnAgendar').onclick = () => Forms.appointmentDialog(null, () => { fichaLoaded = false; if (cv.tab === 'ficha') loadFicha(); App.toast('Cita agendada'); },
         { patient_id: id, first_name: P.first_name, last_name: P.last_name });
+
+      // ---------- imprimir: el plan vigente queda guardado como "plan entregado" ----------
+      $('#btnPrint').onclick = async () => {
+        const b = $('#btnPrint');
+        b.disabled = true;
+        try {
+          const plan = cv.planDoc();
+          await put({ plan });
+          const r = await App.api(`/patients/${id}/plans`, { method: 'POST', body: { plan } });
+          location.href = `${App.base}/plan?v=${r.id}`;
+        } catch (err) { b.disabled = false; App.fail(err); }
+      };
 
       // ---------- vista del paciente: ver lo que ve y compartirle su enlace ----------
       let portal = data.portal;
@@ -112,7 +125,7 @@
                 <a class="btn btn-success btn-sm" data-wa target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1"></i>WhatsApp</a>
                 <button class="btn btn-outline-secondary btn-sm" data-native hidden><i class="bi bi-share me-1"></i>Compartir</button>
               </div>
-              <p class="small text-body-secondary mb-3"><i class="bi bi-shield-lock me-1"></i>Por seguridad el enlace solo se muestra ahora. Si lo pierdes, crea uno nuevo.</p>
+              <p class="small text-body-secondary mb-3"><i class="bi bi-shield-lock me-1"></i>Es personal: quien lo tenga ve el seguimiento de ${esc(first)}. Si se filtró, crea uno nuevo.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-primary" data-new></button>
@@ -147,14 +160,14 @@
             try { await navigator.clipboard.writeText(text); App.toast('Mensaje con el enlace copiado'); } catch { q('[data-url]').select(); }
           };
         }
-        paint(null);
+        paint(portal?.url || null);
         q('[data-preview]').onclick = () => { hide(); startPreview(); };
         q('[data-new]').onclick = async () => {
           if (portal && !confirm('El enlace anterior dejará de funcionar. ¿Crear uno nuevo?')) return;
           try {
             const r = await App.api(`/patients/${id}/portal`, { method: 'POST' });
             const wasUsed = !!portal?.last_used_at;
-            portal = { created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), last_used_at: wasUsed ? portal.last_used_at : null };
+            portal = { created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), last_used_at: wasUsed ? portal.last_used_at : null, url: r.url };
             paint(r.url);
           } catch (err) { App.fail(err); }
         };
@@ -178,7 +191,10 @@
       async function loadFicha(force) {
         if (fichaLoaded && !force) return;
         if (!ficha) panel.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
-        try { ficha = await App.api(`/patients/${id}`); } catch (err) { App.fail(err); return; }
+        try {
+          const [f, pl] = await Promise.all([App.api(`/patients/${id}`), App.api(`/patients/${id}/plans`)]);
+          ficha = { ...f, plans: pl.plans };
+        } catch (err) { App.fail(err); return; }
         fichaLoaded = true;
         renderFicha();
       }
@@ -256,6 +272,24 @@
 
           <div class="card fp-card">
             <div class="d-flex justify-content-between align-items-center p-3 pb-2">
+              <h3 class="m-0"><i class="bi bi-journal-text me-2 text-primary"></i>Planes entregados</h3>
+              <button class="btn btn-sm btn-outline-primary" data-act="print"><i class="bi bi-printer me-1"></i>Imprimir plan actual</button>
+            </div>
+            <div class="list-group list-group-flush">
+              ${ficha.plans.length ? ficha.plans.map((x, i) => `
+                <div class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3">
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold">${App.fmtDate(x.created_at)}${i === 0 ? ' <span class="badge text-bg-primary bg-opacity-75">Último</span>' : ''}</div>
+                    <div class="small text-body-secondary">${x.meals} ${x.meals === 1 ? 'tiempo' : 'tiempos'} de comida${x.weight_kg ? ` · peso ${App.fmtNum(x.weight_kg)} kg` : ''}${x.author ? ` · ${esc(x.author)}` : ''}</div>
+                  </div>
+                  <a class="btn btn-sm btn-outline-secondary" href="${App.base}/plan?v=${esc(x.id)}" title="Ver o reimprimir"><i class="bi bi-printer"></i><span class="hide-xs ms-1">Ver</span></a>
+                  <button class="btn btn-sm btn-link text-danger" data-del-plan="${esc(x.id)}" title="Eliminar del historial"><i class="bi bi-trash"></i></button>
+                </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Cada vez que imprimas el plan queda guardado aquí con su fecha.</div>'}
+            </div>
+          </div>
+
+          <div class="card fp-card">
+            <div class="d-flex justify-content-between align-items-center p-3 pb-2">
               <h3 class="m-0"><i class="bi bi-paperclip me-2 text-primary"></i>Fotos y documentos</h3>
               <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-upload me-1"></i>Subir
                 <input type="file" data-upload accept="image/*,application/pdf" hidden multiple></label>
@@ -286,6 +320,13 @@
             location.href = '/admin/pacientes';
           } else if (act === 'new-appt') {
             $('#btnAgendar').click();
+          } else if (act === 'print') {
+            $('#btnPrint').click();
+          } else if (t.dataset.delPlan) {
+            if (!confirm('¿Quitar este plan del historial? El plan actual del paciente no cambia.')) return;
+            await App.api(`/plans/${t.dataset.delPlan}`, { method: 'DELETE' });
+            App.toast('Plan quitado del historial');
+            loadFicha(true);
           } else if (act === 'measure') {
             cv.setTab('medidas');
           } else if (t.dataset.editAppt) {

@@ -172,7 +172,7 @@ export function routes(r) {
     const sub = `(SELECT id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%')`;
     const files = await db.all(`SELECT r2_key FROM files WHERE business_id = ? AND patient_id IN ${sub}`, bid, bid);
     if (files.length) await c.env.FILES.delete(files.map((f) => f.r2_key));
-    const tables = ['files', 'consultations', 'appointments', 'patient_labs', 'recommendations', 'patient_profiles', 'patient_logs', 'portal_links'];
+    const tables = ['files', 'consultations', 'appointments', 'patient_labs', 'recommendations', 'patient_profiles', 'patient_logs', 'portal_links', 'patient_plans'];
     const res = await db.batch([
       ...tables.map((t) => db.prepare(`DELETE FROM ${t} WHERE business_id = ? AND patient_id IN ${sub}`, bid, bid)),
       db.prepare(`DELETE FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, bid),

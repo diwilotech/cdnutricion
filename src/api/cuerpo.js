@@ -6,6 +6,7 @@ import { tenantDb, uuid } from '../lib/db.js';
 import { sha256Hex } from '../lib/auth.js';
 import { localNow } from '../lib/time.js';
 import { getPatient } from './patients.js';
+import { logoUrl, memberPhotoUrl, parseCard } from './card.js';
 
 const LIMITS = { clinical: 100_000, plan: 200_000, tracking: 10_000, log: 10_000 };
 const LAB_KEYS = /^(col|ldl|hdl|tg|glu|hba1c|creat|tfg|bun|urico|k|hb|vitd|tsh)$/;
@@ -68,6 +69,22 @@ async function loadCuerpo(c, patientId, { forPatient = false } = {}) {
   };
 }
 
+// Enlace vigente del paciente. Los creados antes de guardar el token no tienen url (hay que crear uno nuevo).
+async function portalUrl(c, token) {
+  const b = await tenantDb(c).first('SELECT slug FROM businesses WHERE id = ? /* business_id */', c.businessId);
+  return `${c.url.origin}/${b.slug}/p/#${token}`;
+}
+async function activePortal(c, patientId) {
+  const link = await tenantDb(c).first(
+    `SELECT created_at, last_used_at, token FROM portal_links
+      WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+    c.businessId, patientId,
+  );
+  if (!link) return null;
+  const { token, ...rest } = link;
+  return { ...rest, url: token ? await portalUrl(c, token) : null };
+}
+
 async function saveProfile(c, patientId, fields) {
   const db = tenantDb(c);
   const sets = [];
@@ -104,12 +121,8 @@ export function routes(r) {
 
   r.get('/api/admin/patients/:id/cuerpo', 'tenant', async (c) => {
     const data = await loadCuerpo(c, c.params.id);
-    const link = await tenantDb(c).first(
-      `SELECT created_at, last_used_at FROM portal_links
-        WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-      c.businessId, c.params.id,
-    );
-    return json({ ...data, portal: link, user: { name: c.user.name, email: c.user.email } });
+    const portal = await activePortal(c, c.params.id);
+    return json({ ...data, portal, user: { name: c.user.name, email: c.user.email } });
   });
 
   r.put('/api/admin/patients/:id/profile', 'tenant', async (c) => {
@@ -182,12 +195,11 @@ export function routes(r) {
         c.businessId, c.params.id,
       ),
       db.prepare(
-        'INSERT INTO portal_links (id, business_id, patient_id, created_by) VALUES (?, ?, ?, ?)',
-        await sha256Hex(token), c.businessId, c.params.id, c.user.id,
+        'INSERT INTO portal_links (id, business_id, patient_id, created_by, token) VALUES (?, ?, ?, ?, ?)',
+        await sha256Hex(token), c.businessId, c.params.id, c.user.id, token,
       ),
     ]);
-    const b = await db.first('SELECT slug FROM businesses WHERE id = ? /* business_id */', c.businessId);
-    return json({ url: `${c.url.origin}/${b.slug}/p/#${token}` }, 201);
+    return json({ url: await portalUrl(c, token) }, 201);
   });
 
   r.delete('/api/admin/patients/:id/portal', 'tenant', async (c) => {
@@ -195,6 +207,113 @@ export function routes(r) {
       `UPDATE portal_links SET revoked_at = datetime('now') WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL`,
       c.businessId, c.params.id,
     );
+    return json({ ok: true });
+  });
+
+  // ---------- planes entregados (historial que se imprime) ----------
+
+  r.get('/api/admin/patients/:id/plans', 'tenant', async (c) => {
+    const rows = await tenantDb(c).all(
+      `SELECT p.id, p.created_at, p.weight_kg, p.plan, COALESCE(u.name, u.email) AS author
+         FROM patient_plans p LEFT JOIN users u ON u.id = p.created_by
+        WHERE p.business_id = ? AND p.patient_id = ? ORDER BY p.created_at DESC LIMIT 100`,
+      c.businessId, c.params.id,
+    );
+    return json({
+      plans: rows.map(({ plan, ...x }) => {
+        const doc = parse(plan) || {};
+        return { ...x, meals: (doc.meals || []).length, agua: doc.agua || null };
+      }),
+    });
+  });
+
+  // Entregar el plan vigente: se guarda una copia fija. Si no cambió desde la última, se reusa esa.
+  r.post('/api/admin/patients/:id/plans', 'tenant', async (c) => {
+    const db = tenantDb(c);
+    await getPatient(db, c.businessId, c.params.id);
+    const body = await readJson(c.req);
+    const plan = jsonDoc(body.plan, 'plan');
+    if (!plan) throw new HttpError(400, 'Falta el plan');
+    const [last, recs, weight] = await db.batch([
+      db.prepare(
+        'SELECT id, plan, recs FROM patient_plans WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 1',
+        c.businessId, c.params.id,
+      ),
+      db.prepare(
+        'SELECT text FROM recommendations WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 8',
+        c.businessId, c.params.id,
+      ),
+      db.prepare(
+        `SELECT weight_kg FROM consultations WHERE business_id = ? AND patient_id = ? AND weight_kg IS NOT NULL
+          ORDER BY date DESC, created_at DESC LIMIT 1`,
+        c.businessId, c.params.id,
+      ),
+    ]);
+    const recsDoc = JSON.stringify(recs.results.map((x) => x.text));
+    const prev = last.results[0];
+    if (prev && prev.plan === plan && prev.recs === recsDoc) return json({ id: prev.id, reused: true });
+    const id = uuid();
+    await db.run(
+      'INSERT INTO patient_plans (id, business_id, patient_id, plan, recs, weight_kg, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      id, c.businessId, c.params.id, plan, recsDoc, weight.results[0]?.weight_kg ?? null, c.user.id,
+    );
+    return json({ id }, 201);
+  });
+
+  // Todo lo que lleva la hoja impresa: el plan entregado, el consultorio, quién lo entrega y el QR del paciente.
+  r.get('/api/admin/plans/:planId', 'tenant', async (c) => {
+    const db = tenantDb(c);
+    const row = await db.first(
+      `SELECT p.id, p.patient_id, p.plan, p.recs, p.weight_kg, p.created_at, p.created_by,
+              u.name AS user_name, m.card AS member_card, m.handle, m.photo_key
+         FROM patient_plans p
+         LEFT JOIN users u ON u.id = p.created_by
+         LEFT JOIN memberships m ON m.user_id = p.created_by AND m.business_id = p.business_id
+        WHERE p.business_id = ? AND p.id = ?`,
+      c.businessId, c.params.planId,
+    );
+    if (!row) throw new HttpError(404, 'Plan no encontrado');
+    const today = localNow(c.timezone).date;
+    const [patient, business, next, latest] = await db.batch([
+      db.prepare('SELECT id, first_name, last_name, birth_date, goal FROM patients WHERE business_id = ? AND id = ?', c.businessId, row.patient_id),
+      db.prepare('SELECT name, slug, phone, email, logo_key, card FROM businesses WHERE id = ? /* business_id */', c.businessId),
+      db.prepare(
+        `SELECT starts_at FROM appointments WHERE business_id = ? AND patient_id = ?
+            AND status = 'scheduled' AND starts_at >= ? ORDER BY starts_at LIMIT 1`,
+        c.businessId, row.patient_id, today,
+      ),
+      db.prepare(
+        'SELECT id FROM patient_plans WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 1',
+        c.businessId, row.patient_id,
+      ),
+    ]);
+    const b = business.results[0];
+    const bc = parseCard(b.card), mc = parseCard(row.member_card);
+    const portal = await activePortal(c, row.patient_id);
+    return json({
+      id: row.id,
+      created_at: row.created_at,
+      latest: latest.results[0]?.id === row.id,
+      plan: parse(row.plan),
+      recs: parse(row.recs) || [],
+      weight_kg: row.weight_kg,
+      patient: patient.results[0] || null,
+      nextAppointment: next.results[0]?.starts_at || null,
+      business: { name: b.name, phone: bc.phone || b.phone, email: b.email, address: bc.address || null, logo: logoUrl(b.slug, b.logo_key) },
+      professional: row.created_by ? {
+        name: mc.displayName || row.user_name,
+        specialty: mc.specialty || null,
+        phone: mc.phone || null,
+        photo: row.handle ? memberPhotoUrl(b.slug, row.handle, row.photo_key) : null,
+      } : null,
+      portalUrl: portal?.url || null,
+      portalActive: !!portal,
+    });
+  });
+
+  r.delete('/api/admin/plans/:planId', 'tenant', async (c) => {
+    const res = await tenantDb(c).run('DELETE FROM patient_plans WHERE business_id = ? AND id = ?', c.businessId, c.params.planId);
+    if (!res.meta.changes) throw new HttpError(404, 'Plan no encontrado');
     return json({ ok: true });
   });
 
