@@ -200,7 +200,7 @@ const App = (() => {
     nav.className = 'navbar navbar-expand navbar-cdn sticky-top';
     nav.innerHTML = `
       <div class="container-xl">
-        <a class="navbar-brand" href="/admin/"><span class="brand-logo"><i class="bi bi-person-arms-up"></i></span><span class="d-none d-sm-inline">CD Nutrición</span></a>
+        <a class="navbar-brand" href="/admin/"><span class="brand-logo overflow-hidden">${s.businessLogo ? `<img src="${esc(s.businessLogo)}" alt="" style="width:100%;height:100%;object-fit:cover">` : '<i class="bi bi-person-arms-up"></i>'}</span><span class="d-none d-sm-inline">CD Nutrición</span></a>
         <ul class="navbar-nav me-auto d-none d-lg-flex gap-1">${links}</ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item dropdown">

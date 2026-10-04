@@ -3,65 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- El Worker completa título, descripción, imagen y manifiesto de cada consultorio (HTMLRewriter). -->
   <title>Consultorio de nutrición</title>
+  <meta name="description" content="Seguimiento nutricional personalizado">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Consultorio de nutrición">
+  <meta property="og:description" content="Seguimiento nutricional personalizado">
+  <meta property="og:image" content="/cv/icon-512.png">
+  <meta property="og:url" content="">
+  <meta name="theme-color" content="#1388A5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Consultorio">
+  <link rel="manifest" href="">
+  <link rel="apple-touch-icon" href="/cv/icon-180.png">
+  <link rel="icon" type="image/png" href="/cv/icon-192.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="/admin/assets/app.css" rel="stylesheet">
+  <link href="/cv/card.css" rel="stylesheet">
   <script>
     const mq = matchMedia('(prefers-color-scheme: dark)');
     const theme = () => document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light');
     theme(); mq.addEventListener('change', theme);
   </script>
-  <style>
-    .hero { background: radial-gradient(120% 90% at 50% 30%, var(--cdn-stage) 0%, #0F6F8C 100%); color: #fff; border-radius: 1.5rem; padding: 2.5rem 1.5rem; position: relative; overflow: hidden; }
-    .hero .brand-logo { width: 3.5rem; height: 3.5rem; font-size: 1.8rem; border-radius: 1rem; background: rgba(255,255,255,.16); }
-    .hero h1 { font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 800; }
-    .hero p { color: #CDEAF2; }
-    .hero::after { content: ""; position: absolute; right: -60px; bottom: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.07); }
-    .step { width: 2rem; height: 2rem; border-radius: 50%; background: var(--cdn-accent-soft); color: var(--cdn-accent); font-weight: 800; display: grid; place-items: center; flex: none; }
-  </style>
 </head>
 <body>
-  <main class="container py-4 cdn-enter" style="max-width: 46rem">
-    <section class="hero mb-4">
-      <span class="brand-logo mb-3"><i class="bi bi-person-arms-up"></i></span>
-      <h1 id="name">Consultorio de nutrición</h1>
-      <p class="mb-4">Seguimiento nutricional personalizado: tu cuerpo, tus medidas, tu plan y tu progreso.</p>
-      <div class="d-flex gap-2 flex-wrap" id="contact"></div>
-    </section>
-
-    <div class="card mb-3"><div class="card-body p-4">
-      <h2 class="h5 fw-bold mb-3"><i class="bi bi-person-heart me-2 text-primary"></i>¿Eres paciente?</h2>
-      <div class="d-flex gap-3 mb-3"><span class="step">1</span><div>Tu nutricionista te envía un <b>enlace personal</b> por WhatsApp.</div></div>
-      <div class="d-flex gap-3 mb-3"><span class="step">2</span><div>Ábrelo y <b>guárdalo</b> (o agrégalo a la pantalla de inicio). No necesitas contraseña.</div></div>
-      <div class="d-flex gap-3"><span class="step">3</span><div>Ahí verás tu cuerpo, tus medidas, tu plan de alimentación y tu evolución.</div></div>
-      <p class="small text-body-secondary mt-3 mb-0">¿No tienes tu enlace o lo perdiste? Escríbele al consultorio y te envían uno nuevo.</p>
-    </div></div>
-
-    <div class="text-center mt-4">
-      <a class="btn btn-link text-body-secondary small" id="staff"><i class="bi bi-lock me-1"></i>Acceso para profesionales</a>
-    </div>
+  <main class="container py-4 cdn-enter" id="card">
+    <div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando…</span></div></div>
   </main>
+  <script src="/cv/card.js"></script>
   <script>
     (async () => {
       const slug = location.pathname.split('/')[1];
-      document.getElementById('staff').href = `/${slug}/admin/`;
-      let b;
+      const box = document.getElementById('card');
       try {
         const r = await fetch(`/api/public/negocio/${encodeURIComponent(slug)}`);
         if (!r.ok) throw new Error();
-        b = await r.json();
-      } catch { return; }
-      const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-      document.getElementById('name').textContent = b.name;
-      document.title = b.name;
-      const digits = (b.phone || '').replace(/\D/g, '');
-      const phone = digits.length === 10 ? '57' + digits : digits;
-      document.getElementById('contact').innerHTML = [
-        phone && `<a class="btn btn-light fw-semibold" href="https://wa.me/${phone}?text=${encodeURIComponent('Hola, quiero agendar una consulta de nutrición')}" target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1 text-success"></i>Agendar por WhatsApp</a>`,
-        phone && `<a class="btn btn-outline-light" href="tel:+${phone}"><i class="bi bi-telephone me-1"></i>Llamar</a>`,
-        b.email && `<a class="btn btn-outline-light" href="mailto:${esc(b.email)}"><i class="bi bi-envelope me-1"></i>Correo</a>`,
-      ].filter(Boolean).join('');
+        CardView.render(box, await r.json(), { slug });
+      } catch {
+        box.innerHTML = '<p class="text-center text-body-secondary py-5">No pudimos cargar la tarjeta. Intenta de nuevo.</p>';
+      }
+      // Instalable: el service worker guarda la tarjeta para abrirla sin conexión.
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/${slug}/sw.js`, { scope: `/${slug}` }).catch(() => {});
     })();
   </script>
 </body>

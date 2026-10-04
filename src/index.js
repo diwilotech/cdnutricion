@@ -13,9 +13,11 @@ import * as platformApi from './api/platform.js';
 import * as cuerpoApi from './api/cuerpo.js';
 import * as demoApi from './api/demo.js';
 import * as publicApi from './api/public.js';
+import * as cardApi from './api/card.js';
+import { parseCard, logoUrl } from './api/card.js';
 
 const router = new Router();
-for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi, publicApi]) {
+for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi, publicApi, cardApi]) {
   mod.routes(router);
 }
 
@@ -53,13 +55,85 @@ function keepPrefix(res, prefix, url) {
 
 const notFound = (msg) => new HttpError(404, msg || 'Esta página no existe.');
 
+// ---------- tarjeta digital instalable ----------
+
+const THEME = '#1388A5';
+
+// HTML de la tarjeta con su título, descripción, foto (vista previa al compartir) y manifiesto.
+async function cardPage(env, req, url, business) {
+  const slug = business.slug;
+  const plain = new URL(url); plain.pathname = '/negocio'; plain.search = '';
+  const res = await env.ASSETS.fetch(new Request(plain));  // sin encabezados condicionales: el HTML varía por consultorio
+  const card = parseCard(business.card);
+  const img = url.origin + (logoUrl(slug, business.logo_key) || '/cv/icon-512.png');
+  const desc = card.bio || card.specialty || 'Seguimiento nutricional personalizado';
+  const attr = (name, value) => ({ element(e) { e.setAttribute(name, value); } });
+  const out = new HTMLRewriter()
+    .on('title', { element(e) { e.setInnerContent(business.name); } })
+    .on('meta[name="description"]', attr('content', desc))
+    .on('meta[property="og:title"]', attr('content', business.name))
+    .on('meta[property="og:description"]', attr('content', desc))
+    .on('meta[property="og:image"]', attr('content', img))
+    .on('meta[property="og:url"]', attr('content', `${url.origin}/${slug}`))
+    .on('link[rel="manifest"]', attr('href', `/${slug}/manifest.webmanifest`))
+    .on('link[rel="apple-touch-icon"]', attr('href', business.logo_key ? img : '/cv/icon-180.png'))
+    .on('meta[name="apple-mobile-web-app-title"]', attr('content', business.name.slice(0, 30)))
+    .transform(res);
+  const h = new Headers(out.headers);
+  h.delete('etag');
+  h.set('cache-control', 'no-cache');
+  return new Response(out.body, { status: res.status, headers: h });
+}
+
+function manifest(url, business) {
+  const slug = business.slug;
+  const card = parseCard(business.card);
+  const logo = logoUrl(slug, business.logo_key);
+  const icons = logo
+    ? [{ src: logo, sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: logo, sizes: '512x512', type: 'image/png', purpose: 'maskable' }]
+    : [{ src: '/cv/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: '/cv/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }];
+  return new Response(JSON.stringify({
+    id: `/${slug}`,
+    name: business.name,
+    short_name: business.name.length > 24 ? business.name.split(' ')[0].slice(0, 24) : business.name,
+    description: card.bio || card.specialty || 'Consultorio de nutrición',
+    start_url: `/${slug}?src=app`,
+    scope: `/${slug}`,
+    display: 'standalone',
+    background_color: '#F2F5FA',
+    theme_color: THEME,
+    lang: 'es',
+    icons,
+  }), { headers: { 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-cache' } });
+}
+
+// Service worker mínimo: guarda la tarjeta para que abra aunque no haya conexión.
+function serviceWorker(slug) {
+  const js = `const CACHE = 'tarjeta-${slug}-v1', PAGE = '/${slug}';
+self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.add(PAGE))); });
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', (e) => {
+  const u = new URL(e.request.url);
+  if (e.request.mode !== 'navigate' || (u.pathname !== PAGE && u.pathname !== PAGE + '/')) return;
+  e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(PAGE, copy)); return r; })
+    .catch(() => caches.match(PAGE)));
+});`;
+  return new Response(js, {
+    headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', 'service-worker-allowed': `/${slug}` },
+  });
+}
+
 // /<slug>, /<slug>/admin/…, /<slug>/p/
 async function handleBusinessPath(req, env, url, slug) {
   const rest = url.pathname.slice(slug.length + 1) || '/';
   const business = await businessBySlug(env, slug);
   if (!business || business.status !== 'active') throw notFound('No encontramos este consultorio.');
 
-  if (rest === '/') return assetAt(env, req, '/negocio');
+  if (rest === '/') return cardPage(env, req, url, business);
+  if (rest === '/manifest.webmanifest') return manifest(url, business);
+  if (rest === '/sw.js') return serviceWorker(slug);
   if (rest === '/p' || rest === '/p/') return assetAt(env, req, '/p/');
   if (rest === '/admin' || rest.startsWith('/admin/')) {
     if (rest.startsWith('/admin/assets/')) return assetAt(env, req, rest);

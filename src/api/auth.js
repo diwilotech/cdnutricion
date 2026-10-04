@@ -4,6 +4,7 @@ import {
   createSession, sessionCookie, destroySession, createInvite, userByInvite,
 } from '../lib/auth.js';
 import { globalDb } from '../lib/db.js';
+import { logoUrl } from './card.js';
 
 // Abre sesión y elige el negocio si solo tiene uno activo.
 async function startSession(c, user) {
@@ -22,7 +23,7 @@ export function routes(r) {
       email: c.user.email,
       name: c.user.name,
       session: {
-        businessId: s.business_id, businessName: s.business_name, businessSlug: s.business_slug, role: s.role,
+        businessId: s.business_id, businessName: s.business_name, businessSlug: s.business_slug, businessLogo: logoUrl(s.business_slug, s.business_logo_key), role: s.role,
         readOnly: s.read_only, paidUntil: s.paid_until || null,
       },
       businesses: await userBusinesses(c.env, c.user),

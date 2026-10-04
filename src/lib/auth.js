@@ -143,7 +143,7 @@ export async function loadSession(req, env) {
   const row = await globalDb(env).first(
     `SELECT s.id AS session_id, s.business_id,
             u.id AS user_id, u.email, u.name,
-            m.role, b.name AS business_name, b.slug AS business_slug, b.status AS business_status, b.timezone, b.paid_until
+            m.role, b.name AS business_name, b.slug AS business_slug, b.logo_key AS business_logo_key, b.status AS business_status, b.timezone, b.paid_until
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        LEFT JOIN memberships m ON m.user_id = u.id AND m.business_id = s.business_id
@@ -225,7 +225,7 @@ export async function authenticate(c, level) {
   const slug = c.req.headers.get('x-business') || (c.req.method === 'GET' && c.url?.searchParams.get('b')) || null;
   if (slug && slug !== s.business_slug) {
     const b = await globalDb(c.env).first(
-      `SELECT b.id, b.name, b.slug, b.status, b.timezone, b.paid_until, m.role
+      `SELECT b.id, b.name, b.slug, b.status, b.timezone, b.paid_until, b.logo_key, m.role
          FROM businesses b LEFT JOIN memberships m ON m.business_id = b.id AND m.user_id = ?
         WHERE b.slug = ?`,
       s.user_id, slug,
@@ -233,7 +233,7 @@ export async function authenticate(c, level) {
     if (!b) throw new HttpError(404, 'Consultorio no encontrado', 'NO_BUSINESS');
     if (!b.role) throw new HttpError(403, 'No tienes acceso a este consultorio', 'NOT_MEMBER');
     Object.assign(s, {
-      business_id: b.id, business_name: b.name, business_slug: b.slug, business_status: b.status,
+      business_id: b.id, business_name: b.name, business_slug: b.slug, business_logo_key: b.logo_key, business_status: b.status,
       timezone: b.timezone, paid_until: b.paid_until, role: b.role, read_only: isExpired(b.paid_until),
     });
   }

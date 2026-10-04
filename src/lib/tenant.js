@@ -20,7 +20,7 @@ export function slugFromPath(pathname) {
 }
 
 export function businessBySlug(env, slug) {
-  return globalDb(env).first('SELECT id, name, slug, status, email, phone FROM businesses WHERE slug = ?', slug);
+  return globalDb(env).first('SELECT id, name, slug, status, email, phone, logo_key, card FROM businesses WHERE slug = ?', slug);
 }
 
 export function validateSlug(raw) {
