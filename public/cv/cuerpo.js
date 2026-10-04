@@ -314,10 +314,10 @@ function chart(sel, series, unit){
   $(sel).innerHTML = svg + '</svg>';
 }
 function goIdx(i){ S.idx = i; loadSim(i); update(); renderTimeline(); }
-function stopPlay(){ clearInterval(S.play); S.play = null; $('#btnPlay').textContent = 'Reproducir evolución'; }
+function stopPlay(){ clearInterval(S.play); S.play = null; $('#btnPlay').innerHTML = '<i class="bi bi-play-fill me-1"></i>Reproducir evolución'; }
 $('#btnPlay').onclick = () => {
   if (S.play){ stopPlay(); return; }
-  S.lastLevel = null; goIdx(0); $('#btnPlay').textContent = 'Detener';
+  S.lastLevel = null; goIdx(0); $('#btnPlay').innerHTML = '<i class="bi bi-stop-fill me-1"></i>Detener';
   S.play = setInterval(() => { if (S.idx >= pac().hist.length - 1){ stopPlay(); return; } goIdx(S.idx + 1); }, 1300);
 };
 
@@ -417,7 +417,7 @@ function renderPlan(){
   $('#interHint').textContent = nut ? (editPlan ? 'Toca un alimento para cambiar su estado. Para quitarlo, llévalo hasta "Evitar" y tócalo otra vez. Abajo de cada grupo puedes agregar alimentos.' : 'Toca un alimento para cambiar su estado: recomendado, con moderación, evitar o permitido.') : 'Cada alimento equivale a 1 porción en la cantidad indicada. Prefiere los resaltados.';
   $('#xgroups').innerHTML = INTER.map((g,gi) => `<div class="xg"><h4><i style="background:var(${g.col})"></i>${g.n}</h4><div class="por">${g.por}</div>` +
     g.rows.map((r,ri) => `<div class="xrow">${r.it.map((it,ii) => chipItem(it, gi, ri, ii)).join('')}<span class="q">${esc(r.q)}</span>${r.note ? `<span class="xnote">${esc(r.note)}</span>` : ''}</div>`).join('') +
-    (editPlan && nut ? `<div class="xadd"><input class="tin" data-xg="${gi}" placeholder="Nuevo alimento" aria-label="Nuevo alimento para ${g.n}"><input class="tin" data-xq="${gi}" placeholder="Porción, ej. 1 und" aria-label="Porción" style="max-width:150px"><button class="ghost sm" data-xadd="${gi}">Agregar</button></div>` : '') + `</div>`).join('');
+    (editPlan && nut ? `<div class="xadd"><input class="tin" data-xg="${gi}" placeholder="Nuevo alimento" aria-label="Nuevo alimento para ${g.n}"><input class="tin" data-xq="${gi}" placeholder="Porción, ej. 1 und" aria-label="Porción" style="max-width:150px"><button class="btn btn-outline-secondary btn-sm" data-xadd="${gi}">Agregar</button></div>` : '') + `</div>`).join('');
   $$('#xgroups [data-xadd]').forEach(b => b.onclick = () => {
     const gi = Number(b.dataset.xadd), n = $(`[data-xg="${gi}"]`).value.trim(), q = $(`[data-xq="${gi}"]`).value.trim() || '1 porción';
     if (!n){ toast('Escribe el nombre del alimento'); return; }
@@ -438,10 +438,11 @@ $('#uVasos').onclick = () => { aguaU = 'vasos'; renderPlan(); };
 $('#uLitros').onclick = () => { aguaU = 'L'; renderPlan(); };
 $('#wPlus').onclick = () => { agua = Math.min(Math.round(aguaMeta / .25) + 4, agua + 1); renderPlan(); if (agua === Math.round(aguaMeta / .25)) toast('Meta de agua cumplida'); };
 $('#aguaMetaSel').onchange = e => { aguaMeta = Number(e.target.value); renderPlan(); };
+$('#btnEditPlan').hidden = true;  // edición directa: no hay modo "editar plan"
 $('#btnEditPlan').onclick = () => { editPlan = !editPlan; renderPlan(); if (!editPlan) toast(`Plan actualizado para ${pac().nombre}`); };
 $('#wMinus').onclick = () => { agua = Math.max(0, agua - 1); renderPlan(); };
 /* ---------- Edición del plan (solo nutricionista) ---------- */
-let editPlan = false, aguaMeta = 2;
+let editPlan = cfg.mode === 'nutri', aguaMeta = 2;  // el profesional edita el plan directamente
 // Plan guardado del paciente; si no hay, se usa la plantilla de arriba.
 if (D.plan){
   if (Array.isArray(D.plan.meals)) PLAN.splice(0, PLAN.length, ...D.plan.meals);
@@ -467,7 +468,7 @@ function renderPlanEdit(box){
           <label class="ef" style="max-width:130px"><span>Hora</span><input class="tin" type="time" data-f="h" value="${to24(m.h)}"></label>
           <label class="ef"><span>Nota</span><input class="tin" data-f="note" value="${esc(m.note || '')}" placeholder="Ej. Pre-entreno"></label>
         </div>
-        <div class="mtools"><button class="ghost sm" data-mv="-1" ${mi === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button class="ghost sm" data-mv="1" ${mi === PLAN.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button><button class="ghost sm danger" data-delm aria-label="Eliminar ${esc(m.n)}">Eliminar</button></div></div>
+        <div class="mtools"><button class="btn btn-outline-secondary btn-sm" data-mv="-1" ${mi === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button class="btn btn-outline-secondary btn-sm" data-mv="1" ${mi === PLAN.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button><button class="btn btn-outline-danger btn-sm" data-delm aria-label="Eliminar ${esc(m.n)}">Eliminar</button></div></div>
       <div class="ecomps">${m.c.map(([k, lab, val], ci) => `<div class="ecomp">
           <select class="tin" data-ci="${ci}" data-f="lab" aria-label="Tipo">${CTYPES.map(([kk, l]) => `<option ${l === lab ? 'selected' : ''}>${l}</option>`).join('')}${CTYPES.some(t => t[1] === lab) ? '' : `<option selected>${esc(lab)}</option>`}</select>
           <input class="tin" data-ci="${ci}" data-f="val" value="${esc(val)}" placeholder="Porción o alimentos, ej. 125 g de pollo" aria-label="Detalle">
@@ -497,7 +498,7 @@ function renderPlanEdit(box){
 function renderGoalsEdit(){
   $('#goals').innerHTML = META.map((g,i) => `<div class="goal editing"><label class="ef"><span>Meta</span><input class="tin" data-gi="${i}" data-f="n" value="${esc(g.n)}"></label>
       <label class="ef"><span>Frecuencia</span><input class="tin" data-gi="${i}" data-f="d" value="${esc(g.d)}"></label>
-      <div class="row" style="gap:8px;margin-top:6px"><label class="ef" style="max-width:110px"><span>Veces</span><input class="tin" type="number" min="1" max="10" data-gi="${i}" data-f="max" value="${g.max}"></label><button class="ghost sm danger" data-delg="${i}" style="align-self:flex-end">Quitar</button></div></div>`).join('') +
+      <div class="cv-row" style="gap:8px;margin-top:6px"><label class="ef" style="max-width:110px"><span>Veces</span><input class="tin" type="number" min="1" max="10" data-gi="${i}" data-f="max" value="${g.max}"></label><button class="btn btn-outline-danger btn-sm" data-delg="${i}" style="align-self:flex-end">Quitar</button></div></div>`).join('') +
     `<button class="addmeal" id="addGoal" style="min-height:100px">+ Agregar meta</button>`;
   $$('#goals [data-gi]').forEach(i => i.addEventListener('input', () => { const g = META[Number(i.dataset.gi)], f = i.dataset.f; g[f] = f === 'max' ? clamp(parseInt(i.value) || 1, 1, 10) : i.value; g.used = Math.min(g.used, g.max); }));
   $$('#goals [data-delg]').forEach(b => b.onclick = () => { META.splice(Number(b.dataset.delg), 1); renderPlan(); });
@@ -675,10 +676,10 @@ function refreshMedidas(){
   CAMPOS.forEach(g => g.f.forEach(([k]) => { const e = $(`#pv_${k}`); if (!e) return; const v = SIMK.includes(k) ? null : S.prev?.[k]; e.textContent = v != null ? `Antes: ${n1(v)}` : ''; }));
   // barra de estimados
   const rejN = S.rej.size;
-  $('#estBar').innerHTML = nEst || rejN ? `<div class="row" style="justify-content:space-between;gap:10px">
+  $('#estBar').innerHTML = nEst || rejN ? `<div class="cv-row" style="justify-content:space-between;gap:10px">
       <div style="min-width:0"><b class="estword">${nEst} medida${nEst === 1 ? '' : 's'} estimada${nEst === 1 ? '' : 's'}</b>
       <p class="empty" style="margin:2px 0 0">${ro ? 'Algunas medidas son estimadas y tu nutricionista las confirmará.' : 'Se calculan con el peso, la estatura, el % de grasa, la edad y lo que ya mediste. Acepta las que te sirvan o reemplázalas midiendo; los indicadores las usan mientras tanto.'}</p></div>
-      <div class="row nutri-only" style="gap:6px">${nEst ? '<button class="primary" id="estAll">Aceptar todas</button><button class="ghost" id="estNone">Descartar todas</button>' : ''}${rejN ? `<button class="ghost" id="estAgain">Volver a estimar (${rejN})</button>` : ''}</div></div>`
+      <div class="cv-row nutri-only" style="gap:6px">${nEst ? '<button class="btn btn-primary" id="estAll">Aceptar todas</button><button class="btn btn-outline-secondary" id="estNone">Descartar todas</button>' : ''}${rejN ? `<button class="btn btn-outline-secondary" id="estAgain">Volver a estimar (${rejN})</button>` : ''}</div></div>`
     : `<p class="empty" style="margin:0">Todas las medidas están registradas. ${ro ? '' : 'Usa “Nueva medición rápida” para tomar solo lo básico y estimar el resto.'}</p>`;
   if ($('#estAll')) $('#estAll').onclick = () => { Object.assign(S.med, S.est); refreshMedidas(); toast('Medidas estimadas aceptadas'); };
   if ($('#estNone')) $('#estNone').onclick = () => { Object.keys(S.est).forEach(k => S.rej.add(k)); refreshMedidas(); toast('Estimados descartados'); };
@@ -859,7 +860,7 @@ function drawLesions(sh){
 function renderRiskBanner(){
   const rs = riesgos(); paintOrgans(rs);
   const altos = rs.filter(r => r.lv > 0);
-  $('#riskBanner').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">Riesgos de salud</h3><button class="ghost" id="btnVerSalud">Ver historia clínica</button></div>
+  $('#riskBanner').innerHTML = `<div class="cv-row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">Riesgos de salud</h3><button class="btn btn-outline-secondary" id="btnVerSalud">Ver historia clínica</button></div>
     <div class="rchips">${rs.length ? rs.map(r => `<span class="rchip" style="--c:var(${LV[r.lv][1]})" title="${esc(r.why[0])}"><i></i>${r.n}: <b>${LV[r.lv][0]}</b></span>`).join('') : '<span class="empty">Sin riesgos registrados por la nutricionista.</span>'}</div>
     ${(clin().lesiones || []).length ? `<p class="empty" style="margin:10px 0 0">Lesiones: ${clin().lesiones.map(l => `${ZONAS[l.z].toLowerCase()} (${esc(l.n.toLowerCase())})`).join(', ')}. Se ven en la vista Silueta.</p>` : ''}
     ${clin().meds.length ? `<p class="empty" style="margin:10px 0 0">${clin().meds.length} medicamento${clin().meds.length > 1 ? 's' : ''} activo${clin().meds.length > 1 ? 's' : ''}: ${clin().meds.map(m => m.n).join(', ')}.</p>` : ''}`;
@@ -931,12 +932,23 @@ function bindSalud(){
 }
 
 /* ---------- Navegación ---------- */
+const TAB_ORDER = ['cuerpo', 'medidas', 'salud', 'evolucion', 'plan', 'ficha'];
 function setTab(t){
+  if (t === 'ficha' && S.rol !== 'nutri') t = 'cuerpo';
   const prev = S.tab; S.tab = t;
+  $('#app').dataset.tab = t;
   if (t === 'medidas' && S.vista !== 'medidas'){ S.prevVista = S.vista; setVista('medidas'); }
   else if (prev === 'medidas' && t !== 'medidas' && S.vista === 'medidas') setVista(S.prevVista || 'capas');
-  $$('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  $$('.cv-tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
   $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== t);
+  // Transición: la sección entra desde el lado hacia el que se avanza.
+  const panel = $(`[data-panel="${t}"]`), dir = TAB_ORDER.indexOf(t) - TAB_ORDER.indexOf(prev);
+  if (panel && prev !== t){
+    panel.style.setProperty('--enter-x', dir > 0 ? '28px' : dir < 0 ? '-28px' : '0px');
+    panel.classList.remove('cv-enter'); void panel.offsetWidth; panel.classList.add('cv-enter');
+    if (window.innerWidth <= 860) window.scrollTo({ top:0, behavior:'smooth' });
+  }
+  cfg.onTab?.(t);
   if (t === 'evolucion') renderTimeline();
   if (t === 'plan') renderPlan();
   if (t === 'salud') renderSalud();
@@ -952,12 +964,12 @@ function renderHead(){
   const p = pac(), nut = S.rol === 'nutri';
   $('#stageWho').textContent = P0.birth_date ? `${p.nombre} · ${p.edad} años` : p.nombre;
   $('#recTitle').textContent = nut ? `Recomendaciones para ${p.nombre.split(' ')[0]}` : 'Recomendaciones de tu nutricionista';
-  $('.tabs [data-tab="cuerpo"]').textContent = nut ? 'Cuerpo del paciente' : 'Mi cuerpo';
-  $('#avatar').textContent = nut ? (cfg.userInitials || 'N') : p.ini;
-  const sin = p.hist.length ? '' : ' Aún no hay mediciones: la figura es de referencia.';
-  $('#nota').textContent = (nut
-    ? `Vista de nutricionista · ${NUTRI}. Cambia a “Paciente” para ver lo que ve ${p.nombre.split(' ')[0]}.`
-    : cfg.mode === 'paciente' ? `${NUTRI} · tu seguimiento nutricional.` : `Vista previa: así lo ve ${p.nombre.split(' ')[0]}.`) + sin;
+  $('.cv-tabs [data-tab="cuerpo"] span').textContent = nut ? 'Cuerpo' : 'Mi cuerpo';
+  $('#cvName').textContent = p.nombre;
+  $('#avatar').textContent = p.ini;
+  const sin = p.hist.length ? '' : ' · Aún sin mediciones';
+  const datos = [P0.birth_date ? `${p.edad} años` : null, P0.sex === 'F' ? 'Mujer' : P0.sex === 'M' ? 'Hombre' : null, P0.height_cm ? `${p.talla} cm` : null].filter(Boolean).join(' · ');
+  $('#nota').textContent = (nut ? (datos || 'Completa sus datos en Ficha') : `${NUTRI} · tu seguimiento nutricional`) + sin;
 }
 function setRol(r){
   S.rol = r; document.body.classList.toggle('is-nutri', r === 'nutri');
@@ -965,13 +977,14 @@ function setRol(r){
   $('#rolPaciente').setAttribute('aria-pressed', r === 'paciente'); $('#rolNutri').setAttribute('aria-pressed', r === 'nutri');
   if (r === 'paciente') setPaciente(S.pid); else renderHead();
   renderMedidas();
-  if (r !== 'nutri') editPlan = false;
+  editPlan = r === 'nutri';
+  if (S.tab === 'ficha' && r !== 'nutri') setTab('cuerpo');
   if (S.tab === 'plan') renderPlan();
 }
 
 $('#rolPaciente').onclick = () => setRol('paciente');
 $('#rolNutri').onclick = () => setRol('nutri');
-$$('.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$$('.cv-tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 function setVista(v){
   S.vista = v; $('#figure').classList.toggle('silueta', v === 'silueta'); $('#figure').classList.toggle('medidas', v === 'medidas');
   $('#vCapas').setAttribute('aria-pressed', v === 'capas'); $('#vSilueta').setAttribute('aria-pressed', v === 'silueta'); $('#vMedidas').setAttribute('aria-pressed', v === 'medidas');
@@ -1004,6 +1017,7 @@ $('#labDate').value = TODAY;
 if (!cfg.canSwitch) $('#rolSeg').hidden = true;
 setPaciente(S.pid);
 setRol(S.rol);
+setTab(TAB_ORDER.includes(cfg.initialTab) ? cfg.initialTab : 'cuerpo');
 requestAnimationFrame(tick);
 
 // Guardado automático: cada documento se envía (con pausa) solo si cambió.
@@ -1023,4 +1037,6 @@ SAVERS = [
   cfg.mode === 'paciente' && API.saveLog && saver(logDoc, doc => API.saveLog(TODAY, doc)),
 ].filter(Boolean);
 ['input', 'change', 'click'].forEach(ev => $('[data-panel="plan"]').addEventListener(ev, () => setTimeout(persistAll)));
+// Controlador para la página que carga Cuerpo Vivo (vista previa del paciente, pestañas).
+return { setRol, setTab, toast, get rol(){ return S.rol; }, get tab(){ return S.tab; } };
 } };

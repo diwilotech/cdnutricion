@@ -31,42 +31,33 @@
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:0 40px}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding:0 0 40px}
 h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1180px;margin:0 auto}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .eyebrow{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 
 /* Barra superior */
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:14px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.brand .logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center}
-.brand h1{font-size:22px;font-weight:800}
 .pill{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
 .seg{display:inline-flex;background:var(--surface-2);border-radius:999px;padding:3px}
 .seg button{border:0;background:transparent;padding:7px 14px;border-radius:999px;font-weight:600;font-size:13.5px;color:var(--muted);transition:background .2s,color .2s}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .who{display:flex;align-items:center;gap:8px;font-size:13.5px}
 .who select{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
-.avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
+.cv-avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:16px;background:var(--accent-soft);color:var(--accent);font-family:var(--display);flex:none}
 
-.tabs{display:flex;gap:4px;overflow-x:auto;padding-block:12px 4px}
-.tabs button{border:0;background:transparent;padding:8px 14px;border-radius:10px;font-weight:600;color:var(--muted);white-space:nowrap}
-.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
-.tabs .only-nutri{display:none}
-.is-nutri .tabs .only-nutri{display:inline-block}
 
-.note{font-size:12.5px;color:var(--muted);padding-block:2px 12px}
+.note{font-size:12.5px;color:var(--muted);margin:0}
 
 /* Grid principal */
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:20px;align-items:start}
 @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Escenario */
-.stage{position:sticky;top:130px;background:radial-gradient(120% 90% at 50% 40%, var(--stage) 0%, var(--stage-2) 100%);color:var(--on-stage);border-radius:22px;padding:16px;overflow:hidden;min-width:0}
+.stage{position:sticky;top:calc(var(--cv-top, 0px) + 70px);background:radial-gradient(120% 90% at 50% 40%, var(--stage) 0%, var(--stage-2) 100%);color:var(--on-stage);border-radius:22px;padding:16px;overflow:hidden;min-width:0}
 @media (max-width:860px){.stage{position:relative;top:0}}
 .stage-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .stage-head h2{font-size:19px;color:var(--on-stage)}
@@ -74,8 +65,8 @@ button{cursor:pointer}
 .stage .seg{background:rgb(255 255 255 / .16)}
 .stage .seg button{color:var(--on-stage-muted)}
 .stage .seg button[aria-pressed="true"]{background:var(--on-stage);color:var(--core)}
-.figure{position:relative;max-width:440px;margin:6px auto 0}
-.figure svg{display:block;width:100%;height:auto}
+.cv-figure{position:relative;max-width:440px;margin:6px auto 0}
+.cv-figure svg{display:block;width:100%;height:auto}
 .legend{display:flex;justify-content:center;gap:16px;font-size:12.5px;color:var(--on-stage-muted);flex-wrap:wrap}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 
@@ -115,7 +106,7 @@ button{cursor:pointer}
 .panel{display:flex;flex-direction:column;gap:16px;min-width:0}
 .card{background:var(--surface);border-radius:var(--r);padding:18px;border:1px solid var(--line);min-width:0}
 .card h3{font-size:17px;margin-bottom:12px}
-.row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.cv-row{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
 
 .health{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center}
 .ring{width:118px;height:118px;position:relative}
@@ -152,8 +143,6 @@ button{cursor:pointer}
 .ctrl label span{font-family:var(--mono);font-weight:500}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .ctrl .full{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.ghost{border:1px solid var(--line);background:transparent;border-radius:10px;padding:7px 12px;font-weight:600;font-size:13px}
-.primary{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:9px 16px;font-weight:700}
 
 /* Recomendaciones */
 .recs{display:flex;flex-direction:column;gap:10px}
@@ -320,9 +309,6 @@ button.st{cursor:default}
 .ef > span{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .ef.inline{flex-direction:row;align-items:center;gap:6px;min-width:0}
 .mtools{display:flex;gap:4px;flex-wrap:wrap;align-self:flex-start}
-.ghost.sm{padding:5px 9px;font-size:12.5px}
-.ghost.danger{color:var(--bad)}
-.ghost:disabled{opacity:.35;cursor:default}
 .ecomps{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
 .ecomp{display:grid;grid-template-columns:140px minmax(0,1fr) 30px;gap:6px;align-items:center}
 @media (max-width:520px){.ecomp{grid-template-columns:minmax(0,1fr) 30px}.ecomp select{grid-column:1/-1}}
@@ -349,8 +335,8 @@ td.num{font-family:var(--mono)}
 .lv{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px}
 .spark path{fill:none;stroke:var(--accent);stroke-width:2}
 
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,120px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:50;max-width:calc(100% - 32px)}
-.toast.show{transform:translate(-50%,0)}
+.cv-toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,120px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:50;max-width:calc(100% - 32px)}
+.cv-toast.show{transform:translate(-50%,0)}
 
 /* Medidas */
 .medg{display:none}
@@ -383,13 +369,61 @@ td.num{font-family:var(--mono)}
   *{transition-duration:.01ms!important}
 }
 
-/* Integración con la app */
+/* ---------- Integración con Bootstrap y la app ---------- */
+/* Botones de Bootstrap con los colores del paciente (sirve también en el portal, que no carga app.css). */
+#app .btn{border-radius:10px;font-weight:600;font-size:13.5px}
+#app .btn-primary{--bs-btn-bg:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-color:var(--accent-ink);--bs-btn-hover-bg:color-mix(in srgb,var(--accent) 85%,#000);--bs-btn-hover-border-color:color-mix(in srgb,var(--accent) 85%,#000);--bs-btn-hover-color:var(--accent-ink);--bs-btn-active-bg:color-mix(in srgb,var(--accent) 80%,#000);--bs-btn-active-color:var(--accent-ink);--bs-btn-disabled-bg:var(--accent);--bs-btn-disabled-border-color:var(--accent)}
+#app .btn-outline-secondary{--bs-btn-color:var(--ink);--bs-btn-border-color:var(--line);--bs-btn-hover-bg:var(--surface-2);--bs-btn-hover-color:var(--ink);--bs-btn-hover-border-color:var(--line);--bs-btn-active-bg:var(--surface-2);--bs-btn-active-color:var(--ink)}
+#app .btn-outline-danger{--bs-btn-color:var(--bad);--bs-btn-border-color:var(--line);--bs-btn-hover-bg:var(--bad);--bs-btn-hover-border-color:var(--bad)}
+#app .btn-outline-primary{--bs-btn-color:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:var(--accent);--bs-btn-hover-border-color:var(--accent);--bs-btn-hover-color:var(--accent-ink)}
+/* Reglas genéricas de app.css que no aplican dentro de Cuerpo Vivo */
+#app .empty{padding:0;text-align:inherit}
+#app .num{text-align:inherit}
+#app .card{box-shadow:none;border-radius:var(--r);padding:18px}
+#app .card.p-0{padding:0}
+#app p{margin-bottom:0}
+#app .fp-card{padding:0;overflow:hidden}
+
+/* Encabezado del paciente */
+.cv-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-block:16px 6px}
+.cv-who{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}
+.cv-who-txt{min-width:0}
+.cv-name{font-size:22px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cv-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.cv-back{display:inline-flex;align-items:center;gap:4px;color:var(--muted);text-decoration:none;font-weight:600;font-size:13.5px;padding:6px 8px;border-radius:10px}
+.cv-back{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:12px;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--surface);font-size:18px}
 .cv-back:hover{background:var(--surface-2);color:var(--ink)}
-a.ghost{color:var(--ink);text-decoration:none;display:inline-block}
+.cv-preview{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 4px;padding:10px 14px;border-radius:12px;background:var(--accent-soft);color:var(--ink);font-size:13.5px;font-weight:600}
+.cv-preview[hidden]{display:none!important}
+
+/* Pestañas: fila de "pastillas" en escritorio; barra inferior con íconos en celular */
+.cv-tabs{display:flex;gap:4px;overflow-x:auto;padding-block:10px 12px;position:sticky;top:var(--cv-top,0px);z-index:15;background:var(--bg);scrollbar-width:none}
+.cv-tabs::-webkit-scrollbar{display:none}
+.cv-tabs button{border:0;background:transparent;padding:8px 14px;border-radius:10px;font-weight:600;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:background .2s,color .2s}
+.cv-tabs button:hover{color:var(--ink)}
+.cv-tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.cv-tabs .only-nutri{display:none}
+.is-nutri .cv-tabs .only-nutri{display:inline-flex}
+@media (max-width:860px){
+  body{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .cv-tabs{position:fixed;top:auto;left:0;right:0;bottom:0;z-index:1030;justify-content:space-around;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
+    background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgb(11 31 58 / .07);overflow:visible}
+  .cv-tabs button{flex:1;min-width:0;flex-direction:column;gap:2px;padding:6px 2px;border-radius:12px;font-size:11px}
+  .cv-tabs button i{font-size:20px;line-height:1;transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+  .cv-tabs button span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .cv-tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+  .cv-tabs button[aria-selected="true"] i{transform:translateY(-2px) scale(1.1)}
+  .cv-tabs button:active{transform:scale(.94)}
+  .cv-name{font-size:19px}
+  .cv-head .cv-actions .btn-label{display:none}
+  .cv-toast{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+  /* En celular, la figura solo acompaña a las secciones donde aporta */
+  #app[data-tab="salud"] .stage,#app[data-tab="plan"] .stage,#app[data-tab="ficha"] .stage{display:none}
+}
+
+/* Transición entre secciones (la dirección sigue el orden de las pestañas) */
+@keyframes cv-enter{from{opacity:0;transform:translate3d(var(--enter-x,0),8px,0)}to{opacity:1;transform:none}}
+.cv-enter{animation:cv-enter .34s cubic-bezier(.2,.8,.2,1) both}
+@media (prefers-reduced-motion: reduce){.cv-enter{animation:none}}
+
 .cv-dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:20px;max-width:440px;width:calc(100% - 32px)}
-.cv-dialog::backdrop{background:rgb(0 0 0 / .4)}
-.cv-dialog h3{margin:0 0 8px;font-size:18px}
-.cv-dialog input{width:100%;font-family:var(--mono);font-size:12.5px;margin:10px 0}
 .cv-center{min-height:70vh;display:grid;place-items:center;text-align:center;padding:24px}

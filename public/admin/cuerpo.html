@@ -3,127 +3,327 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Cuerpo Vivo · CD Nutrición</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="/cv/cuerpo.css">
+  <title>Paciente · CD Nutrición</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/admin/assets/app.css" rel="stylesheet">
+  <link href="/cv/cuerpo.css" rel="stylesheet">
+  <style>
+    /* En la Ficha la figura no acompaña: el contenido usa todo el ancho. */
+    #app[data-tab="ficha"] .grid { grid-template-columns: minmax(0, 1fr); }
+    #app[data-tab="ficha"] .stage { display: none; }
+    .fp-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px 18px; margin: 0; }
+    .fp-dl dt { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .fp-dl dd { margin: 2px 0 0; font-size: 15px; overflow-wrap: anywhere; }
+  </style>
 </head>
 <body>
-  <div id="root"><div class="cv-center"><p class="empty">Cargando…</p></div></div>
+  <div id="root"><div class="cv-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando…</span></div></div></div>
 
-  <dialog class="cv-dialog" id="linkDialog">
-    <h3>Enlace del paciente</h3>
-    <p class="empty" id="linkStatus" style="margin:0"></p>
-    <div id="linkBox" hidden>
-      <input id="linkUrl" readonly aria-label="Enlace">
-      <div class="row" style="gap:8px">
-        <button class="primary" id="linkCopy">Copiar</button>
-        <a class="ghost" id="linkWa" target="_blank" rel="noopener">Enviar por WhatsApp</a>
-      </div>
-      <p class="empty" style="font-size:12.5px;margin:10px 0 0">Guárdalo ahora: por seguridad no se vuelve a mostrar. Quien tenga el enlace puede ver el seguimiento.</p>
-    </div>
-    <div class="row" style="justify-content:space-between;margin-top:16px;gap:8px">
-      <button class="ghost danger" id="linkRevoke" hidden>Desactivar enlace</button>
-      <span style="margin-left:auto;display:flex;gap:8px">
-        <button class="ghost" id="linkClose">Cerrar</button>
-        <button class="primary" id="linkNew">Crear enlace</button>
-      </span>
-    </div>
-  </dialog>
-
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/admin/assets/app.js"></script>
+  <script src="/admin/assets/forms.js"></script>
   <script src="/cv/cuerpo.js"></script>
   <script>
     (async () => {
+      const me = await App.init('pacientes', { bottomNav: false });
+      if (!me) return;
+      const { esc } = App;
       const $ = (s) => document.querySelector(s);
-      const id = new URLSearchParams(location.search).get('id');
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
       const root = $('#root');
-      const fail = (msg) => { root.innerHTML = `<div class="cv-center"><div><p>${msg.replace(/[<>&]/g, '')}</p><a class="ghost" href="/admin/pacientes">Volver a pacientes</a></div></div>`; };
       if (!id) { location.href = '/admin/pacientes'; return; }
-
-      async function api(path, { method = 'GET', body } = {}) {
-        const res = await fetch('/api/admin' + path, {
-          method,
-          headers: { 'x-cdn': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
-          body: body !== undefined ? JSON.stringify(body) : undefined,
-        });
-        const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
-        if (!res.ok) {
-          if (data?.code === 'NO_SESSION') { location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search); return new Promise(() => {}); }
-          if (data?.code === 'NO_BUSINESS') { location.href = '/admin/'; return new Promise(() => {}); }
-          throw new Error(data?.error || `Error ${res.status}`);
-        }
-        return data;
-      }
+      const nav = document.querySelector('.navbar-cdn');
+      const setTop = () => document.documentElement.style.setProperty('--cv-top', (nav?.offsetHeight || 0) + 'px');
+      setTop(); addEventListener('resize', setTop);
 
       let data;
-      try { data = await api(`/patients/${id}/cuerpo`); } catch (err) { fail(err.message); return; }
+      try {
+        data = await App.api(`/patients/${id}/cuerpo`);
+      } catch (err) {
+        root.innerHTML = `<div class="cv-center"><div><p>${esc(err.message)}</p><a class="btn btn-outline-secondary" href="/admin/pacientes">Volver a pacientes</a></div></div>`;
+        return;
+      }
       const P = data.patient;
+      const first = P.first_name;
+      document.title = `${App.fullName(P)} · CD Nutrición`;
       const who = data.user.name || data.user.email;
-      const initials = who.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-      document.title = `${P.first_name} ${P.last_name || ''} · Cuerpo Vivo`;
+      const put = (body) => App.api(`/patients/${id}/profile`, { method: 'PUT', body });
 
-      const put = (body) => api(`/patients/${id}/profile`, { method: 'PUT', body });
-      await CuerpoVivo.start({
-        root, mode: 'nutri', canSwitch: true, data, userName: who, userInitials: initials,
+      const cv = await CuerpoVivo.start({
+        root, mode: 'nutri', canSwitch: false, data, userName: who,
+        initialTab: params.get('tab'),
+        onTab: (t) => {
+          if (t === 'ficha') setTimeout(() => loadFicha());  // el panel se declara más abajo
+          const u = new URL(location.href);
+          t === 'cuerpo' ? u.searchParams.delete('tab') : u.searchParams.set('tab', t);
+          history.replaceState(null, '', u);
+        },
         api: {
-          addRec: (text) => api(`/patients/${id}/recs`, { method: 'POST', body: { text } }),
-          addMeasure: (body) => api(`/patients/${id}/consultations`, { method: 'POST', body }),
-          updateMeasure: (cid, body) => api(`/consultations/${cid}`, { method: 'PUT', body }),
-          addLab: (body) => api(`/patients/${id}/labs`, { method: 'POST', body }),
+          addRec: (text) => App.api(`/patients/${id}/recs`, { method: 'POST', body: { text } }),
+          addMeasure: (body) => App.api(`/patients/${id}/consultations`, { method: 'POST', body }),
+          updateMeasure: (cid, body) => App.api(`/consultations/${cid}`, { method: 'PUT', body }),
+          addLab: (body) => App.api(`/patients/${id}/labs`, { method: 'POST', body }),
           saveClinical: (clinical) => put({ clinical }),
           savePlan: (plan) => put({ plan }),
           saveTracking: (tracking) => put({ tracking }),
         },
       });
 
-      $('#cvBack').innerHTML = '<a class="cv-back" href="/admin/pacientes">← Pacientes</a>';
-      $('#cvActions').innerHTML = `<a class="ghost" href="/admin/paciente?id=${encodeURIComponent(id)}">Ficha, citas y archivos</a>
-        <button class="primary" id="btnLink">Enlace del paciente</button>`;
+      $('#cvBack').innerHTML = '<a class="cv-back" href="/admin/pacientes" aria-label="Volver a pacientes"><i class="bi bi-arrow-left"></i></a>';
+      $('#cvActions').innerHTML = `
+        <button class="btn btn-outline-primary" id="btnShare"><i class="bi bi-eye"></i><span class="btn-label ms-1">Vista del paciente</span></button>
+        <button class="btn btn-primary" id="btnAgendar"><i class="bi bi-calendar-plus"></i><span class="btn-label ms-1">Agendar</span></button>`;
+      $('#btnAgendar').onclick = () => Forms.appointmentDialog(null, () => { fichaLoaded = false; if (cv.tab === 'ficha') loadFicha(); App.toast('Cita agendada'); },
+        { patient_id: id, first_name: P.first_name, last_name: P.last_name });
 
-      // ---------- enlace privado del paciente ----------
-      const dlg = $('#linkDialog');
+      // ---------- vista del paciente: ver lo que ve y compartirle su enlace ----------
       let portal = data.portal;
-      const fmt = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : '');
-      function paint(url) {
-        $('#linkStatus').textContent = portal
-          ? `Hay un enlace activo desde ${fmt(portal.created_at)}${portal.last_used_at ? ` · último ingreso ${fmt(portal.last_used_at)}` : ' · aún sin usar'}. Crear uno nuevo desactiva el anterior.`
-          : `${P.first_name} todavía no tiene enlace. Con él verá su cuerpo, medidas, salud, evolución y plan, sin usuario ni contraseña.`;
-        $('#linkBox').hidden = !url;
-        $('#linkRevoke').hidden = !portal;
-        $('#linkNew').textContent = portal ? 'Crear enlace nuevo' : 'Crear enlace';
-        if (url) {
-          $('#linkUrl').value = url;
-          const digits = (P.phone || '').replace(/\D/g, '');
-          const phone = digits.length === 10 ? '57' + digits : digits;
-          const text = `Hola ${P.first_name}, este es tu enlace de seguimiento con ${data.business}: ${url}`;
-          $('#linkWa').href = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-          $('#linkWa').hidden = false;
-        }
+      const fmtTs = (s) => (s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
+      function startPreview() {
+        cv.setRol('paciente');
+        const bar = $('#cvPreview');
+        bar.innerHTML = `<span><i class="bi bi-eye me-1"></i>Estás viendo lo que ve ${esc(first)}</span>
+          <button class="btn btn-sm btn-primary" id="endPreview"><i class="bi bi-pencil me-1"></i>Volver a editar</button>`;
+        bar.hidden = false;
+        $('#cvActions').hidden = true;
+        $('#endPreview').onclick = () => { cv.setRol('nutri'); bar.hidden = true; $('#cvActions').hidden = false; };
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      $('#btnLink').onclick = () => { paint(null); dlg.showModal(); };
-      $('#linkClose').onclick = () => dlg.close();
-      $('#linkNew').onclick = async () => {
+
+      $('#btnShare').onclick = () => {
+        const { el, hide } = App.modal(`
+          <div class="modal-header"><h5 class="modal-title">Vista del paciente</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+          <div class="modal-body">
+            <div data-status></div>
+            <button class="btn btn-outline-primary w-100 mt-3" data-preview><i class="bi bi-eye me-1"></i>Ver lo que ve ${esc(first)}</button>
+            <hr class="my-4">
+            <h6 class="fw-bold mb-1">Compartir con ${esc(first)}</h6>
+            <p class="small text-body-secondary mb-3">Con su enlace entra a su seguimiento sin usuario ni contraseña: su cuerpo, medidas, salud, evolución y plan.</p>
+            <div data-linkbox hidden>
+              <div class="input-group mb-2">
+                <input class="form-control form-control-sm font-monospace" readonly data-url aria-label="Enlace">
+                <button class="btn btn-outline-secondary btn-sm" data-copy type="button"><i class="bi bi-copy"></i></button>
+              </div>
+              <div class="d-flex gap-2 flex-wrap mb-2">
+                <a class="btn btn-success btn-sm" data-wa target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1"></i>WhatsApp</a>
+                <button class="btn btn-outline-secondary btn-sm" data-native hidden><i class="bi bi-share me-1"></i>Compartir</button>
+              </div>
+              <p class="small text-body-secondary mb-3"><i class="bi bi-shield-lock me-1"></i>Por seguridad el enlace solo se muestra ahora. Si lo pierdes, crea uno nuevo.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary" data-new></button>
+              <button class="btn btn-link text-danger ms-auto" data-revoke hidden>Desactivar enlace</button>
+            </div>
+          </div>`);
+        const q = (s) => el.querySelector(s);
+
+        function paint(url) {
+          const neverIn = portal && !portal.last_used_at;
+          q('[data-status]').innerHTML = !portal
+            ? `<div class="alert alert-warning d-flex gap-2 mb-0"><i class="bi bi-person-exclamation fs-5"></i><div><b>${esc(first)} aún no tiene acceso.</b><br><span class="small">Crea su enlace y envíaselo para que entre y vea su seguimiento.</span></div></div>`
+            : neverIn
+              ? `<div class="alert alert-warning d-flex gap-2 mb-0"><i class="bi bi-hourglass-split fs-5"></i><div><b>${esc(first)} aún no ha entrado.</b><br><span class="small">Tiene enlace desde ${fmtTs(portal.created_at)}. Recuérdale que entre: crea un enlace nuevo y envíaselo.</span></div></div>`
+              : `<div class="alert alert-success d-flex gap-2 mb-0"><i class="bi bi-check-circle fs-5"></i><div><b>${esc(first)} ya usa su seguimiento.</b><br><span class="small">Último ingreso: ${fmtTs(portal.last_used_at)}.</span></div></div>`;
+          q('[data-new]').innerHTML = portal ? '<i class="bi bi-arrow-repeat me-1"></i>Crear enlace nuevo' : '<i class="bi bi-link-45deg me-1"></i>Crear enlace';
+          q('[data-revoke]').hidden = !portal;
+          q('[data-linkbox]').hidden = !url;
+          if (!url) return;
+          const invite = !portal?.last_used_at;
+          const text = invite
+            ? `Hola ${first} 👋 Te invito a tu espacio de seguimiento en ${data.business}: ahí verás tu cuerpo, tus medidas, tu plan y tu progreso. Entra aquí y guarda el enlace (no necesitas contraseña): ${url}`
+            : `Hola ${first}, este es tu nuevo enlace de seguimiento en ${data.business}: ${url}`;
+          q('[data-url]').value = url;
+          const digits = (P.phone || '').replace(/\D/g, '');
+          q('[data-wa]').href = `https://wa.me/${digits.length === 10 ? '57' + digits : digits}?text=${encodeURIComponent(text)}`;
+          if (navigator.share) {
+            q('[data-native]').hidden = false;
+            q('[data-native]').onclick = () => navigator.share({ title: 'Tu seguimiento', text }).catch(() => {});
+          }
+          q('[data-copy]').onclick = async () => {
+            try { await navigator.clipboard.writeText(text); App.toast('Mensaje con el enlace copiado'); } catch { q('[data-url]').select(); }
+          };
+        }
+        paint(null);
+        q('[data-preview]').onclick = () => { hide(); startPreview(); };
+        q('[data-new]').onclick = async () => {
+          if (portal && !confirm('El enlace anterior dejará de funcionar. ¿Crear uno nuevo?')) return;
+          try {
+            const r = await App.api(`/patients/${id}/portal`, { method: 'POST' });
+            const wasUsed = !!portal?.last_used_at;
+            portal = { created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), last_used_at: wasUsed ? portal.last_used_at : null };
+            paint(r.url);
+          } catch (err) { App.fail(err); }
+        };
+        q('[data-revoke]').onclick = async () => {
+          if (!confirm(`${first} ya no podrá entrar con su enlace actual. ¿Desactivarlo?`)) return;
+          try {
+            await App.api(`/patients/${id}/portal`, { method: 'DELETE' });
+            portal = null;
+            paint(null);
+            App.toast('Enlace desactivado');
+          } catch (err) { App.fail(err); }
+        };
+      };
+
+      // ---------- ficha: datos, citas, consultas y archivos en un solo lugar ----------
+      const panel = $('#fichaPanel');
+      let fichaLoaded = false;
+      let ficha;
+      const canManage = ['owner', 'admin'].includes(me.session.role);
+
+      async function loadFicha(force) {
+        if (fichaLoaded && !force) return;
+        if (!ficha) panel.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+        try { ficha = await App.api(`/patients/${id}`); } catch (err) { App.fail(err); return; }
+        fichaLoaded = true;
+        renderFicha();
+      }
+
+      function renderFicha() {
+        const p = ficha.patient;
+        const digits = (p.phone || '').replace(/\D/g, '');
+        const wa = digits ? `https://wa.me/${digits.length === 10 ? '57' + digits : digits}` : null;
+        const item = (label, value) => `<div><dt>${label}</dt><dd>${value || '<span class="text-body-secondary">—</span>'}</dd></div>`;
+        const icon = (t) => (t?.startsWith('image/') ? 'bi-file-earmark-image' : 'bi-file-earmark-pdf');
+        panel.innerHTML = `
+          <div class="card">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+              <h3 class="m-0"><i class="bi bi-person-vcard me-2 text-primary"></i>Datos del paciente</h3>
+              <div class="d-flex gap-2">
+                ${wa ? `<a class="btn btn-sm btn-outline-success" href="${wa}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i></a>` : ''}
+                <button class="btn btn-sm btn-outline-secondary" data-act="edit"><i class="bi bi-pencil me-1"></i>Editar</button>
+                ${canManage ? '<button class="btn btn-sm btn-outline-danger" data-act="delete" title="Eliminar paciente"><i class="bi bi-trash"></i></button>' : ''}
+              </div>
+            </div>
+            <dl class="fp-dl">
+              ${item('Documento', esc(p.doc_id))}
+              ${item('Sexo', p.sex === 'F' ? 'Mujer' : p.sex === 'M' ? 'Hombre' : '')}
+              ${item('Nacimiento', p.birth_date ? `${App.fmtDate(p.birth_date)} · ${App.age(p.birth_date)} años` : '')}
+              ${item('Estatura', p.height_cm ? `${App.fmtNum(p.height_cm)} cm` : '')}
+              ${item('Teléfono', esc(p.phone))}
+              ${item('Correo', esc(p.email))}
+              ${item('Objetivo', esc(p.goal))}
+              ${item('Estado', p.status === 'archived' ? 'Archivado' : 'Activo')}
+            </dl>
+            ${p.notes ? `<div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-sticky me-1"></i>${esc(p.notes)}</div>` : ''}
+          </div>
+
+          <div class="card fp-card">
+            <div class="d-flex justify-content-between align-items-center p-3 pb-2">
+              <h3 class="m-0"><i class="bi bi-calendar-week me-2 text-primary"></i>Citas</h3>
+              <button class="btn btn-sm btn-primary" data-act="new-appt"><i class="bi bi-calendar-plus me-1"></i>Agendar</button>
+            </div>
+            <div class="list-group list-group-flush">
+              ${ficha.appointments.length ? ficha.appointments.map((a) => `
+                <div class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3">
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold">${App.fmtDateTime(a.starts_at)}</div>
+                    <div class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min${a.reminded_at ? ' · recordatorio enviado' : ''}${a.notes ? ' · ' + esc(a.notes) : ''}</div>
+                  </div>
+                  ${App.statusBadge(a.status)}
+                  ${a.status === 'scheduled' ? `<button class="btn btn-sm btn-outline-success" data-remind="${esc(a.id)}" title="Recordatorio por WhatsApp"><i class="bi bi-whatsapp"></i></button>` : ''}
+                  <button class="btn btn-sm btn-outline-secondary" data-edit-appt="${esc(a.id)}" title="Editar"><i class="bi bi-pencil"></i></button>
+                </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Sin citas</div>'}
+            </div>
+          </div>
+
+          <div class="card fp-card">
+            <div class="d-flex justify-content-between align-items-center p-3 pb-2">
+              <h3 class="m-0"><i class="bi bi-clipboard2-pulse me-2 text-primary"></i>Consultas</h3>
+              <button class="btn btn-sm btn-outline-secondary" data-act="measure"><i class="bi bi-rulers me-1"></i>Nueva medición</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table mb-0">
+                <thead><tr><th>Fecha</th><th class="text-end">Peso</th><th class="text-end">Grasa</th><th class="text-end">Músculo</th><th class="hide-xs">Notas</th><th></th></tr></thead>
+                <tbody>
+                  ${ficha.consultations.length ? ficha.consultations.map((x) => `
+                    <tr>
+                      <td class="text-nowrap">${App.fmtDate(x.date)}</td>
+                      <td class="text-end">${x.weight_kg ? App.fmtNum(x.weight_kg) + ' kg' : '—'}</td>
+                      <td class="text-end">${x.fat_pct ? App.fmtNum(x.fat_pct) + '%' : '—'}</td>
+                      <td class="text-end">${x.muscle_pct ? App.fmtNum(x.muscle_pct) + '%' : '—'}</td>
+                      <td class="hide-xs small text-body-secondary text-truncate" style="max-width:16rem">${esc(x.notes || '')}${Object.keys(x.measures).length ? ` <span class="badge text-bg-light">+${Object.keys(x.measures).length} medidas</span>` : ''}</td>
+                      <td class="text-end"><button class="btn btn-sm btn-link text-danger" data-del-consultation="${esc(x.id)}" title="Eliminar"><i class="bi bi-trash"></i></button></td>
+                    </tr>`).join('') : '<tr><td colspan="6" class="text-center text-body-secondary py-4 small">Sin consultas registradas</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card fp-card">
+            <div class="d-flex justify-content-between align-items-center p-3 pb-2">
+              <h3 class="m-0"><i class="bi bi-paperclip me-2 text-primary"></i>Fotos y documentos</h3>
+              <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-upload me-1"></i>Subir
+                <input type="file" data-upload accept="image/*,application/pdf" hidden multiple></label>
+            </div>
+            <div class="list-group list-group-flush">
+              ${ficha.files.length ? ficha.files.map((f) => `
+                <div class="list-group-item d-flex align-items-center gap-3">
+                  <i class="bi ${icon(f.content_type)} fs-4 text-body-secondary"></i>
+                  <a class="flex-grow-1 text-truncate" href="/api/admin/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>
+                  <span class="small text-body-secondary text-nowrap hide-xs">${(f.size / 1024 / 1024).toFixed(1)} MB · ${App.fmtDate(f.created_at)}</span>
+                  <button class="btn btn-sm btn-link text-danger" data-del-file="${esc(f.id)}" title="Eliminar"><i class="bi bi-trash"></i></button>
+                </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Sube fotos de progreso, exámenes o planes en PDF.</div>'}
+            </div>
+          </div>`;
+      }
+
+      panel.addEventListener('click', async (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        const act = t.dataset.act;
         try {
-          const r = await api(`/patients/${id}/portal`, { method: 'POST' });
-          portal = { created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), last_used_at: null };
-          paint(r.url);
-        } catch (err) { $('#linkStatus').textContent = err.message; }
-      };
-      $('#linkRevoke').onclick = async () => {
-        if (!confirm('El paciente ya no podrá entrar con su enlace actual. ¿Desactivarlo?')) return;
-        try {
-          await api(`/patients/${id}/portal`, { method: 'DELETE' });
-          portal = null;
-          paint(null);
-        } catch (err) { $('#linkStatus').textContent = err.message; }
-      };
-      $('#linkCopy').onclick = async () => {
-        $('#linkUrl').select();
-        try { await navigator.clipboard.writeText($('#linkUrl').value); $('#linkCopy').textContent = 'Copiado'; }
-        catch { document.execCommand('copy'); }
-        setTimeout(() => ($('#linkCopy').textContent = 'Copiar'), 1500);
-      };
+          if (act === 'edit') {
+            // Sexo, nacimiento y estatura alimentan la figura: se recarga la vista completa.
+            Forms.patientDialog(ficha.patient, () => location.reload());
+          } else if (act === 'delete') {
+            if (!confirm(`¿Eliminar a ${App.fullName(ficha.patient)} con todas sus consultas, citas y archivos? No se puede deshacer.`)) return;
+            await App.api(`/patients/${id}`, { method: 'DELETE' });
+            location.href = '/admin/pacientes';
+          } else if (act === 'new-appt') {
+            $('#btnAgendar').click();
+          } else if (act === 'measure') {
+            cv.setTab('medidas');
+          } else if (t.dataset.editAppt) {
+            const a = ficha.appointments.find((x) => x.id === t.dataset.editAppt);
+            Forms.appointmentDialog({ ...a, patient_id: id, first_name: P.first_name, last_name: P.last_name }, () => loadFicha(true));
+          } else if (t.dataset.remind) {
+            t.disabled = true;
+            await App.api(`/appointments/${t.dataset.remind}/remind`, { method: 'POST' });
+            App.toast('Recordatorio enviado por WhatsApp');
+            loadFicha(true);
+          } else if (t.dataset.delConsultation) {
+            if (!confirm('¿Eliminar esta consulta? También sale de la evolución.')) return;
+            await App.api(`/consultations/${t.dataset.delConsultation}`, { method: 'DELETE' });
+            location.reload();
+          } else if (t.dataset.delFile) {
+            if (!confirm('¿Eliminar este archivo?')) return;
+            await App.api(`/files/${t.dataset.delFile}`, { method: 'DELETE' });
+            App.toast('Archivo eliminado');
+            loadFicha(true);
+          }
+        } catch (err) {
+          t.disabled = false;
+          App.fail(err);
+        }
+      });
+
+      panel.addEventListener('change', async (ev) => {
+        if (!ev.target.matches('[data-upload]')) return;
+        for (const file of ev.target.files) {
+          const form = new FormData();
+          form.append('file', file);
+          try {
+            await App.api(`/patients/${id}/files`, { method: 'POST', form });
+            App.toast(`${file.name} subido`);
+          } catch (err) { App.fail(err); }
+        }
+        loadFicha(true);
+      });
     })();
   </script>
 </body>

@@ -159,15 +159,16 @@ const App = (() => {
   // ---------- encabezado / navegación ----------
 
   const NAV = [
-    ['inicio', '/admin/', 'bi-speedometer2', 'Inicio'],
+    ['inicio', '/admin/', 'bi-house', 'Inicio'],
     ['pacientes', '/admin/pacientes', 'bi-people', 'Pacientes'],
-    ['citas', '/admin/citas', 'bi-calendar-week', 'Citas'],
+    ['citas', '/admin/citas', 'bi-calendar-week', 'Agenda'],
     ['ajustes', '/admin/ajustes', 'bi-gear', 'Ajustes'],
   ];
 
-  function renderNav(active) {
+  function renderNav(active, { bottomNav = true } = {}) {
     const s = me.session || {};
-    const links = NAV.map(
+    const items = s.businessId ? NAV : [];
+    const links = items.map(
       ([key, href, icon, label]) =>
         `<li class="nav-item"><a class="nav-link ${key === active ? 'active' : ''}" href="${href}"><i class="bi ${icon} me-1"></i>${label}</a></li>`,
     ).join('');
@@ -182,34 +183,46 @@ const App = (() => {
             .join('') +
           '<li><hr class="dropdown-divider"></li>'
         : '';
+    // Sin barra inferior (p. ej. Cuerpo Vivo usa la suya), las secciones van en el menú en celular.
+    const mobileLinks = !bottomNav && items.length
+      ? items.map(([, href, icon, label]) => `<li class="d-lg-none"><a class="dropdown-item" href="${href}"><i class="bi ${icon} me-2"></i>${label}</a></li>`).join('') +
+        '<li class="d-lg-none"><hr class="dropdown-divider"></li>'
+      : '';
 
     const nav = document.createElement('nav');
-    nav.className = 'navbar navbar-expand-lg navbar-dark navbar-cdn sticky-top';
+    nav.className = 'navbar navbar-expand navbar-cdn sticky-top';
     nav.innerHTML = `
       <div class="container-xl">
-        <a class="navbar-brand" href="/admin/"><i class="bi bi-heart-pulse me-1"></i>CD Nutrición</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-label="Menú">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="mainNav">
-          <ul class="navbar-nav me-auto">${s.businessId ? links : ''}</ul>
-          <ul class="navbar-nav">
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-shop me-1"></i>${esc(s.businessName || 'Sin negocio')}
-                <span class="d-lg-none"> · ${esc(me.name || me.email)}</span>
-              </a>
-              <ul class="dropdown-menu dropdown-menu-end">
-                ${switcher}
-                <li><span class="dropdown-item-text small text-body-secondary">${esc(me.email)}<br>${esc(ROLE[s.role] || '')}</span></li>
-                <li><button class="dropdown-item" data-action="change-password"><i class="bi bi-key me-2"></i>Cambiar contraseña</button></li>
-                <li><button class="dropdown-item" data-action="logout"><i class="bi bi-box-arrow-right me-2"></i>Salir</button></li>
-              </ul>
-            </li>
-          </ul>
-        </div>
+        <a class="navbar-brand" href="/admin/"><span class="brand-logo"><i class="bi bi-person-arms-up"></i></span><span class="d-none d-sm-inline">CD Nutrición</span></a>
+        <ul class="navbar-nav me-auto d-none d-lg-flex gap-1">${links}</ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="avatar" style="width:1.9rem;height:1.9rem;font-size:.75rem">${esc(((me.name || me.email || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('')).toUpperCase())}</span>
+              <span class="text-truncate" style="max-width:12rem">${esc(s.businessName || 'Sin negocio')}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+              ${mobileLinks}
+              ${switcher}
+              <li><span class="dropdown-item-text small text-body-secondary">${esc(me.name || '')}<br>${esc(me.email)} · ${esc(ROLE[s.role] || '')}</span></li>
+              <li><button class="dropdown-item" data-action="change-password"><i class="bi bi-key me-2"></i>Cambiar contraseña</button></li>
+              <li><button class="dropdown-item" data-action="logout"><i class="bi bi-box-arrow-right me-2"></i>Salir</button></li>
+            </ul>
+          </li>
+        </ul>
       </div>`;
     document.body.prepend(nav);
+    document.querySelector('main')?.classList.add('cdn-enter');
+
+    if (bottomNav && items.length) {
+      const bar = document.createElement('nav');
+      bar.className = 'bottom-nav';
+      bar.setAttribute('aria-label', 'Secciones');
+      bar.innerHTML = items.map(([key, href, icon, label]) =>
+        `<a href="${href}" class="${key === active ? 'active' : ''}" ${key === active ? 'aria-current="page"' : ''}><i class="bi ${icon}${key === active ? '-fill' : ''}"></i><span>${label}</span></a>`).join('');
+      document.body.appendChild(bar);
+      document.body.classList.add('has-bottom-nav');
+    }
     if (s.readOnly) {
       const bar = document.createElement('div');
       bar.className = 'alert alert-danger rounded-0 border-0 text-center small fw-semibold py-2 mb-0';
@@ -309,13 +322,13 @@ const App = (() => {
   }
 
   // Devuelve la info del usuario o null si la página no debe continuar (falta negocio).
-  async function init(active, { needsBusiness = true } = {}) {
+  async function init(active, { needsBusiness = true, bottomNav = true } = {}) {
     me = await api('/auth/me');
     if (!me.session) {
       location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search);
       return null;
     }
-    renderNav(active);
+    renderNav(active, { bottomNav });
     if (needsBusiness && !me.session.businessId) {
       businessPicker();
       return null;
