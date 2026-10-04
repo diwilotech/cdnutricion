@@ -62,7 +62,7 @@ export function routes(r) {
 
   r.get('/api/admin/team', 'tenant', async (c) => {
     const items = await tenantDb(c).all(
-      `SELECT u.id, u.email, u.name, m.role, m.created_at, (u.pin_hash IS NOT NULL) AS has_password
+      `SELECT u.id, u.email, u.name, m.role, m.handle, m.created_at, (u.pin_hash IS NOT NULL) AS has_password
          FROM memberships m JOIN users u ON u.id = m.user_id
         WHERE m.business_id = ? ORDER BY m.role, u.email`,
       c.businessId,

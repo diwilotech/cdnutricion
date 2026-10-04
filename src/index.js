@@ -14,7 +14,7 @@ import * as cuerpoApi from './api/cuerpo.js';
 import * as demoApi from './api/demo.js';
 import * as publicApi from './api/public.js';
 import * as cardApi from './api/card.js';
-import { parseCard, logoUrl } from './api/card.js';
+import { parseCard, logoUrl, isValidHandle, memberCardData } from './api/card.js';
 
 const router = new Router();
 for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi, publicApi, cardApi]) {
@@ -59,25 +59,39 @@ const notFound = (msg) => new HttpError(404, msg || 'Esta página no existe.');
 
 const THEME = '#1388A5';
 
-// HTML de la tarjeta con su título, descripción, foto (vista previa al compartir) y manifiesto.
-async function cardPage(env, req, url, business) {
-  const slug = business.slug;
-  const plain = new URL(url); plain.pathname = '/negocio'; plain.search = '';
-  const res = await env.ASSETS.fetch(new Request(plain));  // sin encabezados condicionales: el HTML varía por consultorio
+// Datos para la página, el manifiesto y el SW de una tarjeta (consultorio o profesional).
+function businessCardInfo(business) {
   const card = parseCard(business.card);
-  const img = url.origin + (logoUrl(slug, business.logo_key) || '/cv/icon-512.png');
-  const desc = card.bio || card.specialty || 'Seguimiento nutricional personalizado';
+  return {
+    base: `/${business.slug}`, name: business.name,
+    desc: card.bio || card.specialty || 'Seguimiento nutricional personalizado',
+    img: logoUrl(business.slug, business.logo_key),
+  };
+}
+function memberCardInfo(data) {
+  return {
+    base: `/${data.path}`, name: data.name,
+    desc: data.card.specialty ? `${data.card.specialty} · ${data.org}` : data.card.bio || data.org,
+    img: data.logo,
+  };
+}
+
+// HTML de la tarjeta con su título, descripción, foto (vista previa al compartir) y manifiesto.
+async function cardPage(env, url, info) {
+  const plain = new URL(url); plain.pathname = '/negocio'; plain.search = '';
+  const res = await env.ASSETS.fetch(new Request(plain));  // sin encabezados condicionales: el HTML varía por tarjeta
+  const img = url.origin + (info.img || '/cv/icon-512.png');
   const attr = (name, value) => ({ element(e) { e.setAttribute(name, value); } });
   const out = new HTMLRewriter()
-    .on('title', { element(e) { e.setInnerContent(business.name); } })
-    .on('meta[name="description"]', attr('content', desc))
-    .on('meta[property="og:title"]', attr('content', business.name))
-    .on('meta[property="og:description"]', attr('content', desc))
+    .on('title', { element(e) { e.setInnerContent(info.name); } })
+    .on('meta[name="description"]', attr('content', info.desc))
+    .on('meta[property="og:title"]', attr('content', info.name))
+    .on('meta[property="og:description"]', attr('content', info.desc))
     .on('meta[property="og:image"]', attr('content', img))
-    .on('meta[property="og:url"]', attr('content', `${url.origin}/${slug}`))
-    .on('link[rel="manifest"]', attr('href', `/${slug}/manifest.webmanifest`))
-    .on('link[rel="apple-touch-icon"]', attr('href', business.logo_key ? img : '/cv/icon-180.png'))
-    .on('meta[name="apple-mobile-web-app-title"]', attr('content', business.name.slice(0, 30)))
+    .on('meta[property="og:url"]', attr('content', url.origin + info.base))
+    .on('link[rel="manifest"]', attr('href', `${info.base}/manifest.webmanifest`))
+    .on('link[rel="apple-touch-icon"]', attr('href', info.img ? img : '/cv/icon-180.png'))
+    .on('meta[name="apple-mobile-web-app-title"]', attr('content', info.name.slice(0, 30)))
     .transform(res);
   const h = new Headers(out.headers);
   h.delete('etag');
@@ -85,22 +99,19 @@ async function cardPage(env, req, url, business) {
   return new Response(out.body, { status: res.status, headers: h });
 }
 
-function manifest(url, business) {
-  const slug = business.slug;
-  const card = parseCard(business.card);
-  const logo = logoUrl(slug, business.logo_key);
-  const icons = logo
-    ? [{ src: logo, sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: logo, sizes: '512x512', type: 'image/png', purpose: 'maskable' }]
+function manifest(info) {
+  const icons = info.img
+    ? [{ src: info.img, sizes: '512x512', type: 'image/png', purpose: 'any' }, { src: info.img, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: info.img, sizes: '512x512', type: 'image/png', purpose: 'maskable' }]
     : [{ src: '/cv/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
       { src: '/cv/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }];
   return new Response(JSON.stringify({
-    id: `/${slug}`,
-    name: business.name,
-    short_name: business.name.length > 24 ? business.name.split(' ')[0].slice(0, 24) : business.name,
-    description: card.bio || card.specialty || 'Consultorio de nutrición',
-    start_url: `/${slug}?src=app`,
-    scope: `/${slug}`,
+    id: info.base,
+    name: info.name,
+    short_name: info.name.length > 24 ? info.name.split(' ')[0].slice(0, 24) : info.name,
+    description: info.desc,
+    start_url: `${info.base}?src=app`,
+    scope: info.base,
     display: 'standalone',
     background_color: '#F2F5FA',
     theme_color: THEME,
@@ -110,8 +121,8 @@ function manifest(url, business) {
 }
 
 // Service worker mínimo: guarda la tarjeta para que abra aunque no haya conexión.
-function serviceWorker(slug) {
-  const js = `const CACHE = 'tarjeta-${slug}-v1', PAGE = '/${slug}';
+function serviceWorker(base) {
+  const js = `const CACHE = 'tarjeta-${base.replace(/\W+/g, '-')}-v1', PAGE = '${base}';
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.add(PAGE))); });
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
@@ -121,7 +132,7 @@ self.addEventListener('fetch', (e) => {
     .catch(() => caches.match(PAGE)));
 });`;
   return new Response(js, {
-    headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', 'service-worker-allowed': `/${slug}` },
+    headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', 'service-worker-allowed': base },
   });
 }
 
@@ -131,9 +142,9 @@ async function handleBusinessPath(req, env, url, slug) {
   const business = await businessBySlug(env, slug);
   if (!business || business.status !== 'active') throw notFound('No encontramos este consultorio.');
 
-  if (rest === '/') return cardPage(env, req, url, business);
-  if (rest === '/manifest.webmanifest') return manifest(url, business);
-  if (rest === '/sw.js') return serviceWorker(slug);
+  if (rest === '/') return cardPage(env, url, businessCardInfo(business));
+  if (rest === '/manifest.webmanifest') return manifest(businessCardInfo(business));
+  if (rest === '/sw.js') return serviceWorker(`/${slug}`);
   if (rest === '/p' || rest === '/p/') return assetAt(env, req, '/p/');
   if (rest === '/admin' || rest.startsWith('/admin/')) {
     if (rest.startsWith('/admin/assets/')) return assetAt(env, req, rest);
@@ -142,6 +153,15 @@ async function handleBusinessPath(req, env, url, slug) {
       return Response.redirect(`${url.origin}/${slug}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
     }
     return keepPrefix(await assetAt(env, req, rest), `/${slug}`, url);
+  }
+  // Tarjeta de un profesional: /<slug>/<handle>[/manifest.webmanifest | /sw.js]
+  const [, handle, extra = ''] = rest.split('/');
+  if (isValidHandle(handle) && ['', 'manifest.webmanifest', 'sw.js'].includes(extra)) {
+    const data = await memberCardData(env, slug, handle);
+    if (!data) throw notFound('No encontramos esta tarjeta.');
+    if (extra === 'manifest.webmanifest') return manifest(memberCardInfo(data));
+    if (extra === 'sw.js') return serviceWorker(`/${data.path}`);
+    return cardPage(env, url, memberCardInfo(data));
   }
   throw notFound();
 }

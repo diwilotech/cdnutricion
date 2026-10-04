@@ -18,10 +18,13 @@
   <main class="container-xl py-4">
     <h1 class="page-title mb-3">Ajustes</h1>
 
-    <!-- Tarjeta digital: editor + vista previa idéntica a la tarjeta pública -->
+    <!-- Tarjetas digitales: la de cada profesional y la del consultorio (base). Vista previa idéntica a la pública. -->
     <div class="card mb-3" id="cardSection">
-      <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span><i class="bi bi-person-badge me-2"></i>Tarjeta digital</span>
+      <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <ul class="nav nav-pills gap-1">
+          <li class="nav-item"><button type="button" class="nav-link active" data-cardtab="me"><i class="bi bi-person-badge me-1"></i>Mi tarjeta</button></li>
+          <li class="nav-item"><button type="button" class="nav-link" data-cardtab="biz"><i class="bi bi-hospital me-1"></i>Consultorio</button></li>
+        </ul>
         <div class="d-flex gap-2">
           <a class="btn btn-sm btn-outline-secondary" id="cardOpen" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Ver tarjeta</a>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="cardCopy"><i class="bi bi-copy me-1"></i>Copiar enlace</button>
@@ -29,59 +32,94 @@
       </div>
       <div class="card-body">
         <div class="row g-4">
-          <form class="col-lg-7" id="cardForm" novalidate>
-            <fieldset id="cardFields">
+          <div class="col-lg-7">
+            <!-- Mi tarjeta (cualquier rol) -->
+            <form id="meForm" class="cdn-enter" novalidate>
               <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="logo-edit" id="logoBox"><i class="bi bi-person-arms-up"></i></div>
+                <div class="logo-edit" data-photo><i class="bi bi-person-arms-up"></i></div>
                 <div>
-                  <div class="fw-semibold mb-1">Foto de perfil</div>
+                  <div class="fw-semibold mb-1">Tu foto</div>
                   <div class="d-flex gap-2 flex-wrap">
-                    <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-camera me-1"></i>Cambiar foto<input type="file" id="logoInput" accept="image/*" hidden></label>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="logoRemove" hidden><i class="bi bi-trash"></i></button>
+                    <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-camera me-1"></i>Cambiar foto<input type="file" data-photo-input accept="image/*" hidden></label>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-photo-remove hidden><i class="bi bi-trash"></i></button>
                   </div>
-                  <div class="form-text">Se recorta en cuadrado. También es el ícono cuando instalan la tarjeta.</div>
+                  <div class="form-text">Se recorta en cuadrado. Es el ícono cuando instalan tu tarjeta.</div>
                 </div>
               </div>
               <div class="row g-3">
+                <div class="col-sm-6"><label class="form-label">Nombre en la tarjeta</label><input name="displayName" class="form-control" maxlength="80" placeholder="Paula Restrepo"></div>
                 <div class="col-sm-6"><label class="form-label">Especialidad</label><input name="specialty" class="form-control" maxlength="80" placeholder="Nutricionista clínica"></div>
-                <div class="col-sm-6"><label class="form-label">Horario</label><input name="hours" class="form-control" maxlength="120" placeholder="Lun a Vie · 7:00 a. m. – 6:00 p. m."></div>
-                <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" id="bioCount">0/500</span></label>
-                  <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntale a tus pacientes cómo los acompañas"></textarea></div>
-                <div class="col-12"><label class="form-label">Dirección</label><input name="address" class="form-control" maxlength="200" placeholder="Cra. 43A #1-50, consultorio 302, Medellín"></div>
+                <div class="col-sm-6"><label class="form-label">WhatsApp</label><input name="phone" type="tel" class="form-control" maxlength="30" placeholder="Si lo dejas vacío, se usa el del consultorio"></div>
+                <div class="col-sm-6"><label class="form-label">Correo público</label><input name="email" type="email" class="form-control" maxlength="254" placeholder="Opcional"></div>
+                <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" data-count>0/500</span></label>
+                  <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntales a tus pacientes cómo los acompañas"></textarea></div>
+                <div class="col-12"><label class="form-label">Dirección de tu tarjeta</label>
+                  <div class="input-group"><span class="input-group-text small" id="meHandlePrefix"></span>
+                    <input name="handle" class="form-control" maxlength="40" pattern="[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?" autocomplete="off" spellcheck="false"></div></div>
                 <div class="col-12">
-                  <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" id="showMap" name="showMap">
-                    <label class="form-check-label fw-semibold" for="showMap">Mostrar mapa en la tarjeta</label>
-                  </div>
-                  <div id="mapFields" class="vc-panel" hidden>
-                    <div class="small text-body-secondary mb-2">Ubica el consultorio de alguna de estas formas:</div>
-                    <div class="d-flex gap-2 flex-wrap mb-2">
-                      <button type="button" class="btn btn-sm btn-outline-primary" id="useLocation"><i class="bi bi-crosshair me-1"></i>Usar mi ubicación actual</button>
-                    </div>
-                    <div class="input-group input-group-sm mb-2">
-                      <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                      <input class="form-control" id="mapsLink" placeholder="…o pega aquí el enlace de Google Maps del consultorio">
-                    </div>
-                    <div class="row g-2">
-                      <div class="col-6"><input name="lat" class="form-control form-control-sm" inputmode="decimal" placeholder="Latitud"></div>
-                      <div class="col-6"><input name="lng" class="form-control form-control-sm" inputmode="decimal" placeholder="Longitud"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label d-flex justify-content-between align-items-center"><span>Enlaces</span>
-                    <span class="d-flex gap-1 flex-wrap" id="linkPresets"></span></label>
-                  <div id="linkRows" class="d-flex flex-column gap-2"></div>
-                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="addLink"><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
+                  <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1"><span>Enlaces</span>
+                    <span class="d-flex gap-1 flex-wrap" data-presets></span></label>
+                  <div data-rows class="d-flex flex-column gap-2"></div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addlink><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
                 </div>
               </div>
-              <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>El nombre, el teléfono (WhatsApp) y el correo se toman de <b>Datos del negocio</b>.</div>
-              <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar tarjeta</button>
-            </fieldset>
-          </form>
+              <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>La dirección, el mapa y el horario se toman de la tarjeta del <b>Consultorio</b>. Si no pones enlaces propios, se muestran los del consultorio.</div>
+              <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar mi tarjeta</button>
+            </form>
+
+            <!-- Consultorio (propietario y administradores) -->
+            <form id="cardForm" class="cdn-enter" novalidate hidden>
+              <fieldset id="cardFields">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="logo-edit" data-photo><i class="bi bi-person-arms-up"></i></div>
+                <div>
+                  <div class="fw-semibold mb-1">Foto o logo del consultorio</div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-camera me-1"></i>Cambiar foto<input type="file" data-photo-input accept="image/*" hidden></label>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-photo-remove hidden><i class="bi bi-trash"></i></button>
+                  </div>
+                  <div class="form-text">Se recorta en cuadrado. También es el ícono cuando instalan la tarjeta del consultorio.</div>
+                </div>
+              </div>
+                <div class="row g-3">
+                  <div class="col-sm-6"><label class="form-label">Especialidad</label><input name="specialty" class="form-control" maxlength="80" placeholder="Centro de nutrición clínica"></div>
+                  <div class="col-sm-6"><label class="form-label">Horario</label><input name="hours" class="form-control" maxlength="120" placeholder="Lun a Vie · 7:00 a. m. – 6:00 p. m."></div>
+                  <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" data-count>0/500</span></label>
+                    <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntales a tus pacientes quiénes son"></textarea></div>
+                  <div class="col-12"><label class="form-label">Dirección</label><input name="address" class="form-control" maxlength="200" placeholder="Cra. 43A #1-50, consultorio 302, Medellín"></div>
+                  <div class="col-12">
+                    <div class="form-check form-switch mb-2">
+                      <input class="form-check-input" type="checkbox" id="showMap" name="showMap">
+                      <label class="form-check-label fw-semibold" for="showMap">Mostrar mapa en las tarjetas</label>
+                    </div>
+                    <div id="mapFields" class="vc-panel" hidden>
+                      <div class="small text-body-secondary mb-2">Ubica el consultorio de alguna de estas formas:</div>
+                      <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="useLocation"><i class="bi bi-crosshair me-1"></i>Usar mi ubicación actual</button>
+                      <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                        <input class="form-control" id="mapsLink" placeholder="…o pega aquí el enlace de Google Maps del consultorio">
+                      </div>
+                      <div class="row g-2">
+                        <div class="col-6"><input name="lat" class="form-control form-control-sm" inputmode="decimal" placeholder="Latitud"></div>
+                        <div class="col-6"><input name="lng" class="form-control form-control-sm" inputmode="decimal" placeholder="Longitud"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                  <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1"><span>Enlaces</span>
+                    <span class="d-flex gap-1 flex-wrap" data-presets></span></label>
+                  <div data-rows class="d-flex flex-column gap-2"></div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addlink><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
+                </div>
+                </div>
+                <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>El nombre, el teléfono (WhatsApp) y el correo se toman de <b>Datos del negocio</b>. La dirección, el mapa y el horario aparecen también en la tarjeta de cada profesional.</div>
+                <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar tarjeta del consultorio</button>
+              </fieldset>
+            </form>
+          </div>
           <div class="col-lg-5">
             <div class="preview-sticky">
-              <div class="small text-body-secondary text-center mb-2"><i class="bi bi-phone me-1"></i>Así se ve tu tarjeta</div>
+              <div class="small text-body-secondary text-center mb-2"><i class="bi bi-phone me-1"></i>Así se ve la tarjeta</div>
               <div class="vc-phone mx-auto" style="max-width:380px"><div id="cardPreview"></div></div>
             </div>
           </div>
@@ -226,6 +264,7 @@
               <div class="fw-medium text-truncate">${esc(u.name || u.email)}</div>
               <div class="small text-body-secondary text-truncate">${esc(u.email)}${u.has_password ? '' : ' · <em>invitación pendiente</em>'}</div>
             </div>
+            ${u.handle && App.slug ? `<a class="btn btn-sm btn-link text-body-secondary" href="/${App.slug}/${esc(u.handle)}" target="_blank" rel="noopener" title="Ver su tarjeta"><i class="bi bi-person-badge"></i></a>` : ''}
             <span class="badge text-bg-light">${App.ROLE[u.role]}</span>
             ${canManage && u.id !== me.userId ? `
               <div class="dropdown">
@@ -269,71 +308,133 @@
         } catch (err) { App.fail(err); }
       };
 
-      // ---------- tarjeta digital ----------
-      let cardData = null;
+      // ---------- tarjetas digitales: la mía (profesional) y la del consultorio ----------
       const LINK_PRESETS = [['Instagram', 'https://instagram.com/'], ['Facebook', 'https://facebook.com/'], ['TikTok', 'https://tiktok.com/@'], ['Sitio web', 'https://']];
+      // Lee también campos deshabilitados (quien no administra igual ve la vista previa).
+      const vals = (form) => Object.fromEntries([...form.elements].filter((e) => e.name).map((e) => [e.name, e.type === 'checkbox' ? e.checked : e.value.trim()]));
       const linkRow = (l = {}) => `<div class="input-group input-group-sm" data-link>
           <span class="input-group-text"><i class="bi ${CardView.linkIcon(l.url || '')}"></i></span>
           <input class="form-control" data-l="label" value="${App.esc(l.label || '')}" placeholder="Nombre" maxlength="40" style="max-width:9.5rem">
           <input class="form-control" data-l="url" value="${App.esc(l.url || '')}" placeholder="https://…" maxlength="300">
           <button type="button" class="btn btn-outline-danger" data-unlink aria-label="Quitar enlace"><i class="bi bi-x-lg"></i></button>
         </div>`;
-      function readCard() {
-        // Lee también campos deshabilitados (quien no administra igual ve la vista previa).
-        const vals = (form) => Object.fromEntries([...form.elements].filter((e) => e.name).map((e) => [e.name, e.type === 'checkbox' ? e.checked : e.value.trim()]));
-        const f = vals($('cardForm'));
-        const b = vals($('businessForm'));  // nombre, teléfono y correo en vivo
+      const readLinks = (form) => [...form.querySelectorAll('[data-link]')]
+        .map((r) => ({ label: r.querySelector('[data-l=label]').value.trim(), url: r.querySelector('[data-l=url]').value.trim() })).filter((l) => l.label || l.url);
+
+      // Foto: se recorta en cuadrado de 512 px en el navegador antes de subirla.
+      function squarePng(file) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const side = Math.min(img.width, img.height), canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 512;
+            canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 512, 512);
+            URL.revokeObjectURL(img.src);
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))), 'image/png');
+          };
+          img.onerror = () => reject(new Error('Ese archivo no es una imagen válida'));
+          img.src = URL.createObjectURL(file);
+        });
+      }
+
+      let biz = null, mine = null, tab = 'me', previewTimer;
+      const editors = {};
+
+      // Enlaces, foto y vista previa en vivo, iguales para las dos tarjetas.
+      function setupEditor(key, form, { photoEndpoint, getPhoto, setPhoto, canEdit }) {
+        const q = (sel) => form.querySelector(sel);
+        q('[data-presets]').innerHTML = LINK_PRESETS.map(([n, u]) => `<button type="button" class="btn btn-sm btn-light py-0 px-2" data-preset="${n}|${u}"><i class="bi ${CardView.linkIcon(u + 'x')} me-1"></i>${n}</button>`).join('');
+        const full = () => form.querySelectorAll('[data-link]').length >= 8 && (App.toast('Máximo 8 enlaces', 'warning'), true);
+        q('[data-presets]').onclick = (ev) => {
+          const b = ev.target.closest('[data-preset]'); if (!b || !canEdit() || full()) return;
+          const [label, url] = b.dataset.preset.split('|');
+          q('[data-rows]').insertAdjacentHTML('beforeend', linkRow({ label, url }));
+          const input = q('[data-rows]').lastElementChild.querySelector('[data-l=url]'); input.focus(); input.setSelectionRange(url.length, url.length);
+          preview();
+        };
+        q('[data-addlink]').onclick = () => { if (!canEdit() || full()) return; q('[data-rows]').insertAdjacentHTML('beforeend', linkRow()); q('[data-rows]').lastElementChild.querySelector('input').focus(); preview(); };
+        q('[data-rows]').onclick = (ev) => { if (ev.target.closest('[data-unlink]') && canEdit()) { ev.target.closest('[data-link]').remove(); preview(); } };
+        form.addEventListener('input', preview);
+        form.addEventListener('change', preview);
+        q('[data-photo-input]').onchange = async (ev) => {
+          const file = ev.target.files[0]; ev.target.value = '';
+          if (!file) return;
+          try {
+            const fd = new FormData();
+            fd.append('file', await squarePng(file), 'foto.png');
+            const r = await App.api(photoEndpoint, { method: 'POST', form: fd });
+            setPhoto(r.logo || r.photo); preview(); App.toast('Foto actualizada');
+          } catch (err) { App.fail(err); }
+        };
+        q('[data-photo-remove]').onclick = async () => {
+          if (!(await App.confirmAction('¿Quitar la foto?'))) return;
+          try { await App.api(photoEndpoint, { method: 'DELETE' }); setPhoto(null); preview(); } catch (err) { App.fail(err); }
+        };
+        editors[key] = { form, getPhoto, canEdit };
+      }
+
+      // Datos que verá la tarjeta pública, armados con lo que hay en pantalla.
+      function currentCard() {
+        const b = vals($('businessForm'));  // nombre, teléfono y correo del consultorio, en vivo
+        const bf = vals($('cardForm'));
+        const bizCard = {
+          specialty: bf.specialty, bio: bf.bio, hours: bf.hours, address: bf.address, showMap: bf.showMap,
+          lat: bf.lat === '' ? null : Number(bf.lat), lng: bf.lng === '' ? null : Number(bf.lng), links: readLinks($('cardForm')),
+        };
+        const bizName = b.name || biz.name;
+        if (tab === 'biz') return { name: bizName, phone: b.phone ?? biz.phone, email: b.email ?? biz.email, slug: biz.slug, logo: biz.logo, card: bizCard };
+        const m = vals($('meForm')), links = readLinks($('meForm'));
         return {
-          name: b.name || cardData.name, phone: b.phone ?? cardData.phone, email: b.email ?? cardData.email, slug: cardData.slug, logo: cardData.logo,
-          card: {
-            specialty: f.specialty, bio: f.bio, hours: f.hours, address: f.address, showMap: f.showMap,
-            lat: f.lat === '' ? null : Number(f.lat), lng: f.lng === '' ? null : Number(f.lng),
-            links: [...document.querySelectorAll('[data-link]')].map((r) => ({ label: r.querySelector('[data-l=label]').value.trim(), url: r.querySelector('[data-l=url]').value.trim() }))
-              .filter((l) => l.label || l.url),
-          },
+          name: m.displayName || mine.name || bizName, org: bizName, slug: biz.slug, path: `${biz.slug}/${m.handle || mine.handle}`,
+          logo: mine.photo, phone: m.phone || b.phone || biz.phone, email: m.email || null,
+          card: { specialty: m.specialty, bio: m.bio, address: bizCard.address, lat: bizCard.lat, lng: bizCard.lng, showMap: bizCard.showMap, hours: bizCard.hours, links: links.length ? links : bizCard.links },
         };
       }
-      let previewTimer;
       function preview() {
         clearTimeout(previewTimer);
         previewTimer = setTimeout(() => {
-          const d = readCard();
+          if (!biz || !mine) return;
+          const d = currentCard();
           CardView.render($('cardPreview'), d, { preview: true });
-          $('bioCount').textContent = `${(d.card.bio || '').length}/500`;
-          $('mapFields').hidden = !d.card.showMap;
-          $('logoBox').innerHTML = d.logo ? `<img src="${App.esc(d.logo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>';
-          $('logoRemove').hidden = !d.logo || !canManage;
-          document.querySelectorAll('[data-link]').forEach((r) => { r.querySelector('.input-group-text i').className = `bi ${CardView.linkIcon(r.querySelector('[data-l=url]').value)}`; });
+          $('mapFields').hidden = !$('cardForm').elements.showMap.checked;
+          for (const [key, ed] of Object.entries(editors)) {
+            const photo = ed.getPhoto(), f = ed.form;
+            f.querySelector('[data-photo]').innerHTML = photo ? `<img src="${App.esc(photo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>';
+            f.querySelector('[data-photo-remove]').hidden = !photo || !ed.canEdit();
+            f.querySelector('[data-count]').textContent = `${f.elements.bio.value.length}/500`;
+            f.querySelectorAll('[data-link]').forEach((r) => { r.querySelector('.input-group-text i').className = `bi ${CardView.linkIcon(r.querySelector('[data-l=url]').value)}`; });
+          }
+          const pub = `${location.origin}/${d.path || d.slug}`;
+          $('cardOpen').href = pub;
+          $('cardCopy').onclick = async () => { try { await navigator.clipboard.writeText(pub); App.toast('Enlace de la tarjeta copiado'); } catch { /* sin permiso */ } };
         }, 120);
       }
+
+      setupEditor('me', $('meForm'), { photoEndpoint: '/card/me/photo', getPhoto: () => mine?.photo, setPhoto: (u) => (mine.photo = u), canEdit: () => true });
+      setupEditor('biz', $('cardForm'), { photoEndpoint: '/card/logo', getPhoto: () => biz?.logo, setPhoto: (u) => (biz.logo = u), canEdit: () => canManage });
+      $('businessForm').addEventListener('input', preview);
+
       async function loadCard() {
-        cardData = await App.api('/card');
-        const c = cardData.card || {};
+        [biz, mine] = await Promise.all([App.api('/card'), App.api('/card/me')]);
+        const c = biz.card || {}, m = mine.card || {};
         App.fillForm($('cardForm'), { specialty: c.specialty, bio: c.bio, hours: c.hours, address: c.address, showMap: !!c.showMap, lat: c.lat ?? '', lng: c.lng ?? '' });
-        $('linkRows').innerHTML = (c.links || []).map(linkRow).join('');
-        const pub = `${location.origin}/${cardData.slug}`;
-        $('cardOpen').href = pub;
-        $('cardCopy').onclick = async () => { try { await navigator.clipboard.writeText(pub); App.toast('Enlace de la tarjeta copiado'); } catch { /* sin permiso */ } };
+        $('cardForm').querySelector('[data-rows]').innerHTML = (c.links || []).map(linkRow).join('');
+        App.fillForm($('meForm'), { displayName: m.displayName || mine.name || '', specialty: m.specialty, phone: m.phone, email: m.email, bio: m.bio, handle: mine.handle });
+        $('meForm').querySelector('[data-rows]').innerHTML = (m.links || []).map(linkRow).join('');
+        $('meHandlePrefix').textContent = `${location.host}/${biz.slug}/`;
         if (!canManage) $('cardFields').disabled = true;
         preview();
       }
-      $('linkPresets').innerHTML = LINK_PRESETS.map(([n, u]) => `<button type="button" class="btn btn-sm btn-light py-0 px-2" data-preset="${n}|${u}"><i class="bi ${CardView.linkIcon(u + 'x')} me-1"></i>${n}</button>`).join('');
-      $('linkPresets').onclick = (ev) => {
-        const b = ev.target.closest('[data-preset]'); if (!b || $('cardFields').disabled) return;
-        if (document.querySelectorAll('[data-link]').length >= 8) return App.toast('Máximo 8 enlaces', 'warning');
-        const [label, url] = b.dataset.preset.split('|');
-        $('linkRows').insertAdjacentHTML('beforeend', linkRow({ label, url }));
-        const input = $('linkRows').lastElementChild.querySelector('[data-l=url]'); input.focus(); input.setSelectionRange(url.length, url.length);
+
+      document.querySelectorAll('[data-cardtab]').forEach((b) => (b.onclick = () => {
+        tab = b.dataset.cardtab;
+        document.querySelectorAll('[data-cardtab]').forEach((x) => x.classList.toggle('active', x === b));
+        $('meForm').hidden = tab !== 'me';
+        $('cardForm').hidden = tab !== 'biz';
+        const f = tab === 'me' ? $('meForm') : $('cardForm');
+        f.classList.remove('cdn-enter'); void f.offsetWidth; f.classList.add('cdn-enter');
         preview();
-      };
-      $('addLink').onclick = () => {
-        if (document.querySelectorAll('[data-link]').length >= 8) return App.toast('Máximo 8 enlaces', 'warning');
-        $('linkRows').insertAdjacentHTML('beforeend', linkRow()); $('linkRows').lastElementChild.querySelector('input').focus(); preview();
-      };
-      $('linkRows').onclick = (ev) => { if (ev.target.closest('[data-unlink]')) { ev.target.closest('[data-link]').remove(); preview(); } };
-      $('cardForm').addEventListener('input', preview);
-      $('cardForm').addEventListener('change', preview);
-      $('businessForm').addEventListener('input', preview);
+      }));
 
       // Coordenadas desde un enlace de Google Maps (@lat,lng · q=lat,lng · !3dlat!4dlng).
       $('mapsLink').addEventListener('input', (ev) => {
@@ -352,40 +453,18 @@
         }, () => { $('useLocation').disabled = false; App.toast('No pudimos obtener tu ubicación', 'error'); }, { enableHighAccuracy: true, timeout: 10000 });
       };
 
-      // Foto: se recorta en cuadrado de 512 px en el navegador antes de subirla.
-      function squarePng(file) {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            const s = Math.min(img.width, img.height), canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 512;
-            canvas.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 512, 512);
-            URL.revokeObjectURL(img.src);
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))), 'image/png');
-          };
-          img.onerror = () => reject(new Error('Ese archivo no es una imagen válida'));
-          img.src = URL.createObjectURL(file);
-        });
-      }
-      $('logoInput').onchange = async (ev) => {
-        const file = ev.target.files[0]; ev.target.value = '';
-        if (!file) return;
-        try {
-          const form = new FormData();
-          form.append('file', await squarePng(file), 'logo.png');
-          const r = await App.api('/card/logo', { method: 'POST', form });
-          cardData.logo = r.logo; preview(); App.toast('Foto actualizada');
-        } catch (err) { App.fail(err); }
-      };
-      $('logoRemove').onclick = async () => {
-        if (!(await App.confirmAction('¿Quitar la foto de perfil?'))) return;
-        try { await App.api('/card/logo', { method: 'DELETE' }); cardData.logo = null; preview(); } catch (err) { App.fail(err); }
-      };
       App.onSubmit($('cardForm'), async () => {
-        const d = readCard();
-        const r = await App.api('/card', { method: 'PUT', body: { card: d.card } });
-        cardData.card = r.card;
-        App.toast('Tarjeta guardada');
+        const r = await App.api('/card', { method: 'PUT', body: { card: currentCard().card } });
+        biz.card = r.card;
+        App.toast('Tarjeta del consultorio guardada');
+      });
+      App.onSubmit($('meForm'), async (d) => {
+        const body = { handle: d.handle, card: { displayName: d.displayName, specialty: d.specialty, phone: d.phone, email: d.email, bio: d.bio, links: readLinks($('meForm')) } };
+        const r = await App.api('/card/me', { method: 'PUT', body });
+        mine.card = r.card; mine.handle = r.handle;
+        App.toast('Tu tarjeta quedó guardada');
+        preview();
+        loadTeam();
       });
 
       App.onSubmit($('businessForm'), async (d) => {

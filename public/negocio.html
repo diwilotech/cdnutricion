@@ -36,17 +36,19 @@
   <script src="/cv/card.js"></script>
   <script>
     (async () => {
-      const slug = location.pathname.split('/')[1];
+      // /<consultorio> o /<consultorio>/<profesional>
+      const [slug, handle] = location.pathname.split('/').filter(Boolean);
+      const base = handle ? `/${slug}/${handle}` : `/${slug}`;
       const box = document.getElementById('card');
       try {
-        const r = await fetch(`/api/public/negocio/${encodeURIComponent(slug)}`);
+        const r = await fetch(`/api/public/negocio/${encodeURIComponent(slug)}${handle ? '/' + encodeURIComponent(handle) : ''}`);
         if (!r.ok) throw new Error();
         CardView.render(box, await r.json(), { slug });
       } catch {
         box.innerHTML = '<p class="text-center text-body-secondary py-5">No pudimos cargar la tarjeta. Intenta de nuevo.</p>';
       }
       // Instalable: el service worker guarda la tarjeta para abrirla sin conexión.
-      if ('serviceWorker' in navigator) navigator.serviceWorker.register(`/${slug}/sw.js`, { scope: `/${slug}` }).catch(() => {});
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register(`${base}/sw.js`, { scope: base }).catch(() => {});
     })();
   </script>
 </body>

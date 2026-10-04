@@ -32,12 +32,14 @@ const CardView = (() => {
     const c = d.card || {};
     const phone = waNumber(d.phone);
     const hasMap = c.showMap && c.lat != null && c.lng != null;
-    const pageUrl = `${location.origin}/${slug}`;
+    const pageUrl = `${location.origin}/${d.path || slug}`;
+    const initials = String(d.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     el.innerHTML = `
       <div class="vc">
         <section class="vc-hero">
-          <div class="vc-avatar">${d.logo ? `<img src="${esc(d.logo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>'}</div>
+          <div class="vc-avatar">${d.logo ? `<img src="${esc(d.logo)}" alt="">` : d.org ? `<span class="vc-initials">${esc(initials)}</span>` : '<i class="bi bi-person-arms-up"></i>'}</div>
           <h1 class="vc-name">${esc(d.name || 'Tu consultorio')}</h1>
+          ${d.org ? `<a class="vc-org" href="/${esc(slug)}"><i class="bi bi-hospital me-1"></i>${esc(d.org)}</a>` : ''}
           ${c.specialty ? `<div class="vc-spec">${esc(c.specialty)}</div>` : ''}
           ${c.bio ? `<p class="vc-bio">${esc(c.bio)}</p>` : ''}
         </section>

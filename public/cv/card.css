@@ -13,6 +13,9 @@
   box-shadow: 0 10px 30px rgb(0 0 0 / .18);
 }
 .vc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vc-initials { font-family: var(--cdn-display); font-weight: 800; font-size: 2.4rem; letter-spacing: .02em; }
+.vc-org { position: relative; z-index: 1; display: inline-block; color: #DDF1F6; text-decoration: none; font-weight: 600; font-size: .9rem; margin-bottom: 8px; }
+.vc-org:hover { color: #fff; text-decoration: underline; }
 .vc-name { position: relative; z-index: 1; font-family: var(--cdn-display); font-weight: 800; font-size: 1.55rem; line-height: 1.15; margin: 0 0 4px; }
 .vc-spec { position: relative; z-index: 1; display: inline-block; font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.16); padding: 4px 10px; border-radius: 999px; margin-bottom: 8px; }
 .vc-bio { position: relative; z-index: 1; color: #DDF1F6; margin: 6px 0 0; font-size: .95rem; white-space: pre-line; }
@@ -51,4 +54,7 @@
 
 /* Marco de celular para la vista previa en Ajustes */
 .vc-phone { border: 10px solid #0B1F3A; border-radius: 38px; background: var(--cdn-bg); padding: 18px 12px; max-height: 720px; overflow-y: auto; box-shadow: 0 20px 50px rgb(11 31 58 / .18); scrollbar-width: thin; }
-.vc-phone .vc-name { font-size: 1.35rem; }
+.vc-phone .vc-initials { font-family: var(--cdn-display); font-weight: 800; font-size: 2.4rem; letter-spacing: .02em; }
+.vc-org { position: relative; z-index: 1; display: inline-block; color: #DDF1F6; text-decoration: none; font-weight: 600; font-size: .9rem; margin-bottom: 8px; }
+.vc-org:hover { color: #fff; text-decoration: underline; }
+.vc-name { font-size: 1.35rem; }
