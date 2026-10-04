@@ -101,10 +101,10 @@ export async function setPassword(env, userId, password) {
 }
 
 // ---------- invitaciones ----------
-// Link /admin/login#invite=<token> para crear (o restablecer) la contraseña.
+// Link /#invite=<token> (login genérico en la raíz) para crear (o restablecer) la contraseña.
 // Se guarda solo el SHA-256; generar uno nuevo invalida el anterior.
 
-export const invitePath = (token) => `/admin/login#invite=${token}`;
+export const invitePath = (token) => `/#invite=${token}`;
 
 export async function createInvite(env, userId) {
   const token = randomHex(32);

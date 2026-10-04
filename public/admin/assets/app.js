@@ -6,6 +6,9 @@ const App = (() => {
   // Multi-tenant por ruta: el panel vive en /<slug>/admin y la API recibe el consultorio en x-business.
   const SLUG = (location.pathname.match(/^\/([a-z0-9-]+)\/admin(?:\/|$)/) || [])[1] || null;
   const BASE = SLUG ? `/${SLUG}/admin` : '/admin';
+  // Login: el del consultorio (/<slug>/admin/login) o el genérico en la raíz "/".
+  const LOGIN = SLUG ? `${BASE}/login` : '/';
+  const onLogin = () => location.pathname === '/' || location.pathname.startsWith(`${BASE}/login`);
   let me = null;
 
   // Tema claro/oscuro según el sistema.
@@ -79,8 +82,8 @@ const App = (() => {
     const res = await fetch(API + path, { method, headers, body: payload, credentials: 'same-origin' });
     const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
     if (!res.ok) {
-      if (data?.code === 'NO_SESSION' && !location.pathname.startsWith(`${BASE}/login`)) {
-        location.href = `${BASE}/login?next=` + encodeURIComponent(location.pathname + location.search);
+      if (data?.code === 'NO_SESSION' && !onLogin()) {
+        location.href = `${LOGIN}?next=` + encodeURIComponent(location.pathname + location.search);
         return new Promise(() => {});
       }
       if (data?.code === 'NOT_MEMBER' || (data?.code === 'NO_BUSINESS' && SLUG)) {
@@ -249,7 +252,7 @@ const App = (() => {
       const a = ev.target.closest('[data-action]');
       if (a?.dataset.action === 'logout') {
         await api('/auth/logout', { method: 'POST' }).catch(() => {});
-        location.href = `${BASE}/login`;
+        location.href = LOGIN;
       } else if (a?.dataset.action === 'change-password') {
         changePasswordDialog();
       }
@@ -332,7 +335,7 @@ const App = (() => {
   async function init(active, { needsBusiness = true, bottomNav = true } = {}) {
     me = await api('/auth/me');
     if (!me.session) {
-      location.href = `${BASE}/login?next=` + encodeURIComponent(location.pathname + location.search);
+      location.href = `${LOGIN}?next=` + encodeURIComponent(location.pathname + location.search);
       return null;
     }
     renderNav(active, { bottomNav });

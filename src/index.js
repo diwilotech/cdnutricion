@@ -190,11 +190,15 @@ async function handleLegacyAdmin(req, env, url) {
   if (slug && session && !(await isMember(env, session.user_id, slug))) slug = null;
   if (!slug && session) slug = await defaultSlug(env, session);
   if (slug) return Response.redirect(`${url.origin}/${slug}${url.pathname}${url.search}`, 302);
-  const isLogin = /^\/admin\/login(\.html)?$/.test(url.pathname);
-  if (!isLogin && !session) {
-    return Response.redirect(`${url.origin}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
+  if (!session) {
+    // El login genérico vive en la raíz "/". /admin/login (links viejos, también con #invite=…)
+    // redirige ahí: el navegador conserva el fragmento.
+    const isLogin = /^\/admin\/login(\.html)?$/.test(url.pathname);
+    const isHome = /^\/admin\/?$/.test(url.pathname);
+    const next = isLogin ? url.search : isHome ? '' : `?next=${encodeURIComponent(url.pathname + url.search)}`;
+    return Response.redirect(`${url.origin}/${next}`, 302);
   }
-  return env.ASSETS.fetch(req);  // login genérico, o sesión sin consultorios
+  return env.ASSETS.fetch(req);  // sesión sin consultorios
 }
 
 function withHeaders(res, headers) {
@@ -212,7 +216,15 @@ export default {
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
         return withHeaders(await handleLegacyAdmin(req, env, url), SECURITY_HEADERS);
       }
-      if (url.pathname === '/') return Response.redirect(`${url.origin}/admin/`, 302);
+      // Raíz: login genérico (sin consultorio en la URL). Con sesión, directo a su consultorio.
+      if (url.pathname === '/') {
+        const session = await loadSession(req, env);
+        if (session) {
+          const s = await defaultSlug(env, session);
+          return Response.redirect(`${url.origin}${s ? `/${s}` : ''}/admin/`, 302);
+        }
+        return withHeaders(await assetAt(env, req, '/admin/login'), SECURITY_HEADERS);
+      }
       const slug = slugFromPath(url.pathname);
       if (slug) return withHeaders(await handleBusinessPath(req, env, url, slug), SECURITY_HEADERS);
       return env.ASSETS.fetch(req);

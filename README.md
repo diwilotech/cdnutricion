@@ -83,7 +83,7 @@ pequeño a su seguimiento (si el paciente no tiene enlace reutilizable, se le cr
 
 Crear consultorios e invitar propietarios se hace desde Diwilo Web. Dentro del consultorio, un propietario o
 administrador agrega a su equipo en **Ajustes → Equipo**: si la persona no tiene cuenta, se genera un link
-`/admin/login#invite=<token>` para que cree su contraseña. El mismo botón genera un link nuevo si alguien la olvida.
+`/#invite=<token>` (el login genérico vive en la raíz del dominio) para que cree su contraseña. El mismo botón genera un link nuevo si alguien la olvida.
 Los PIN de antes siguen entrando una vez y piden crear la contraseña.
 
 ## Desarrollo local
