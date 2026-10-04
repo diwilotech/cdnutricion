@@ -54,17 +54,65 @@ const DEMO = [
     measures: { cintura: 80, cadera: 95, brazoC: 36, pas: 116, pad: 72 },
     appt: [6, '18:00', 'control'], clinical: { habitos: ['Entrena fuerza 5 veces por semana'] }, labs: null,
     rec: 'Sube a 1,8 g de proteína por kg y agrega un refrigerio antes de entrenar.' },
+
+  // ---- Tres casos que empeoran: leve → moderado → grave (el historial también va en aumento) ----
+  { first: 'Valentina', last: 'Ríos', sex: 'F', birth: '1992-05-18', h: 162, phone: '3011234567', goal: 'Frenar el aumento de peso',
+    hist: [[68, 31, 25], [68.8, 31.8, 24.8], [69.6, 32.5, 24.4], [70.5, 33.2, 24], [71.5, 34, 23.5]],
+    measures: { cintura: 84, abdomen: 90, cadera: 102, brazoR: 30, pas: 124, pad: 80, fc: 78, glu: 98, visceral: 8, agua: 46 },
+    appt: [2, '17:00', 'control'],
+    clinical: { riesgos: [{ k: 'metab', lv: 1, nota: 'Subió 3,5 kg en 4 meses y la grasa va en aumento' }],
+      antecedentes: ['Madre con hipertensión'], habitos: ['Sedentaria desde que cambió de trabajo', 'Duerme 6 horas', 'Come fuera 3 veces por semana'] },
+    labs: [[150, { col: 198, ldl: 122, hdl: 52, tg: 140, glu: 94, vitd: 27 }], [20, { col: 214, ldl: 136, hdl: 48, tg: 168, glu: 99, vitd: 22 }]],
+    rec: 'Estamos a tiempo: volvamos a 3 caminatas de 40 minutos y cenas sin harina entre semana.' },
+  { first: 'Ricardo', last: 'Mejía', sex: 'M', birth: '1977-09-03', h: 175, phone: '3022345678', goal: 'Bajar de peso y controlar presión y azúcar',
+    hist: [[98, 31, 30], [99.5, 32, 29.6], [100.8, 32.8, 29.2], [102, 33.6, 28.8], [103.2, 34.3, 28.4], [104.5, 35, 28]],
+    measures: { cintura: 112, abdomen: 118, cadera: 108, cuello: 44, pas: 138, pad: 90, fc: 84, glu: 118, visceral: 17, agua: 47 },
+    appt: [3, '07:30', 'control'],
+    clinical: {
+      riesgos: [{ k: 'cv', lv: 2, nota: 'Hipertensión, LDL alto, HDL bajo y fuma' }, { k: 'metab', lv: 2, nota: 'Prediabetes en ascenso (HbA1c 6,3 %)' },
+        { k: 'hep', lv: 1, nota: 'Triglicéridos altos: probable hígado graso' }],
+      cond: [{ n: 'Hipertensión arterial', d: '2024' }, { n: 'Prediabetes', d: '2025' }, { n: 'Dislipidemia', d: '2025' }],
+      meds: [{ n: 'Losartán', dosis: '50 mg', h: 'Mañana', para: 'Presión arterial' }],
+      lesiones: [{ z: 'rodI', n: 'Dolor por sobrecarga', lv: 1, d: '2025' }],
+      alergias: ['Ninguna conocida'], antecedentes: ['Padre con infarto a los 58 años'],
+      habitos: ['Fuma 10 cigarrillos al día', 'Cerveza los fines de semana', 'Comidas rápidas 4 veces por semana'] },
+    labs: [[160, { col: 226, ldl: 148, hdl: 40, tg: 210, glu: 108, hba1c: 6.0, urico: 7.2, creat: 1.1 }],
+      [20, { col: 241, ldl: 160, hdl: 36, tg: 265, glu: 121, hba1c: 6.3, urico: 7.9, creat: 1.2, tfg: 78 }]],
+    rec: 'Prioridad: dejar de fumar y cortar la cerveza. Proteína en cada comida y harinas medidas.' },
+  { first: 'Gloria', last: 'Patiño', sex: 'F', birth: '1963-01-27', h: 156, phone: '3033456789', goal: 'Compensar la diabetes y proteger el riñón',
+    hist: [[96, 44, 20], [97.4, 44.6, 19.6], [98.8, 45.2, 19.2], [100.2, 45.8, 18.8], [101.6, 46.4, 18.4], [103, 47, 18]],
+    measures: { cintura: 121, abdomen: 128, cadera: 128, cuello: 41, brazoR: 38, pantorrilla: 42, pas: 158, pad: 96, fc: 92, glu: 168, visceral: 22, agua: 40, edadMet: 78 },
+    appt: [1, '08:30', 'control'],
+    clinical: {
+      riesgos: [{ k: 'metab', lv: 2, nota: 'Diabetes tipo 2 descompensada (HbA1c 8,6 %)' }, { k: 'renal', lv: 2, nota: 'Enfermedad renal 3b y potasio alto' },
+        { k: 'cv', lv: 2, nota: 'Hipertensión no controlada, LDL alto y obesidad' }, { k: 'resp', lv: 1, nota: 'Apnea del sueño' }],
+      cond: [{ n: 'Diabetes tipo 2', d: '2018' }, { n: 'Hipertensión arterial', d: '2012' }, { n: 'Enfermedad renal crónica, estadio 3b', d: '2025' },
+        { n: 'Obesidad grado III', d: '2020' }, { n: 'Apnea obstructiva del sueño', d: '2023' }],
+      meds: [{ n: 'Insulina glargina', dosis: '20 UI', h: 'Noche', para: 'Diabetes' }, { n: 'Metformina', dosis: '850 mg', h: 'Almuerzo', para: 'Diabetes (revisar por riñón)' },
+        { n: 'Losartán', dosis: '100 mg', h: 'Mañana', para: 'Presión y riñón' }, { n: 'Amlodipino', dosis: '10 mg', h: 'Mañana', para: 'Presión arterial' },
+        { n: 'Atorvastatina', dosis: '40 mg', h: 'Noche', para: 'Colesterol' }, { n: 'Furosemida', dosis: '40 mg', h: 'Mañana', para: 'Retención de líquidos' }],
+      lesiones: [{ z: 'rodD', n: 'Artrosis', lv: 2, d: '2019' }, { z: 'rodI', n: 'Artrosis', lv: 1, d: '2021' }, { z: 'lumbar', n: 'Lumbalgia crónica', lv: 1, d: '2022' }],
+      alergias: ['Sulfas'], antecedentes: ['Madre con diabetes y amputación de pie'],
+      habitos: ['Casi no camina por dolor de rodillas', 'Toma gaseosa a diario', 'Duerme mal por la apnea'] },
+    labs: [[240, { col: 238, ldl: 152, hdl: 38, tg: 240, glu: 148, hba1c: 7.4, creat: 1.3, tfg: 52, bun: 24, urico: 7.4, k: 4.9, hb: 11.8, vitd: 16 }],
+      [120, { col: 246, ldl: 160, hdl: 36, tg: 270, glu: 158, hba1c: 7.9, creat: 1.45, tfg: 44, bun: 28, urico: 7.9, k: 5.2, hb: 11.4, vitd: 15 }],
+      [20, { col: 256, ldl: 168, hdl: 34, tg: 298, glu: 171, hba1c: 8.6, creat: 1.62, tfg: 38, bun: 31, urico: 8.4, k: 5.5, hb: 11.1, vitd: 14, tsh: 3.8 }]],
+    rec: 'Caso prioritario: cero gaseosa, harinas en porción medida y frutas bajas en potasio. Coordinar con su médico el ajuste de metformina por el riñón.' },
 ];
 
 export function routes(r) {
   r.post('/api/admin/demo', 'manager', async (c) => {
     const db = tenantDb(c);
     const bid = c.businessId;
-    const exists = await db.first(`SELECT COUNT(*) AS n FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, bid);
-    if (exists.n) throw new HttpError(409, 'Ya hay pacientes de ejemplo. Bórralos primero si quieres crearlos de nuevo.');
+    // Crea solo los que falten: así se pueden sumar ejemplos nuevos sin duplicar los anteriores.
+    const have = new Set((await db.all(`SELECT doc_id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, bid)).map((x) => x.doc_id));
+    if (have.size >= DEMO.length) throw new HttpError(409, 'Ya están todos los pacientes de ejemplo.');
     const today = localNow(c.timezone).date;
     const stmts = [];
+    let created = 0;
     DEMO.forEach((d, i) => {
+      if (have.has(`DEMO-${i + 1}`)) return;
+      created++;
       const pid = uuid();
       stmts.push(db.prepare(
         `INSERT INTO patients (id, business_id, first_name, last_name, doc_id, sex, birth_date, phone, height_cm, goal, notes)
@@ -96,10 +144,11 @@ export function routes(r) {
           pid, bid, JSON.stringify({ lesiones: [], riesgos: [], cond: [], meds: [], alergias: [], antecedentes: [], habitos: [], ...d.clinical }),
         ));
       }
-      if (d.labs) {
+      const labs = !d.labs ? [] : Array.isArray(d.labs) ? d.labs : [[20, d.labs]];
+      for (const [daysAgo, vals] of labs) {
         stmts.push(db.prepare(
           'INSERT INTO patient_labs (id, business_id, patient_id, date, vals, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-          uuid(), bid, pid, addDays(today, -20), JSON.stringify(d.labs), c.user.id,
+          uuid(), bid, pid, addDays(today, -daysAgo), JSON.stringify(vals), c.user.id,
         ));
       }
       if (d.rec) {
@@ -110,7 +159,7 @@ export function routes(r) {
       }
     });
     await db.batch(stmts);
-    return json({ ok: true, patients: DEMO.length }, 201);
+    return json({ ok: true, patients: created }, 201);
   });
 
   // Borra los pacientes de ejemplo con todo lo suyo.
