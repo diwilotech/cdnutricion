@@ -40,6 +40,17 @@
           <div class="card-header py-3"><i class="bi bi-plug me-2"></i>Integraciones</div>
           <div class="card-body" id="integrations"></div>
         </div>
+
+        <div class="card mt-3" id="demoCard">
+          <div class="card-header py-3"><i class="bi bi-people me-2"></i>Pacientes de ejemplo</div>
+          <div class="card-body">
+            <p class="small text-body-secondary">Crea 7 pacientes de ejemplo con historial de consultas, citas para los próximos días, historia clínica, exámenes y recomendaciones, para conocer la app. Se identifican con el documento <code>DEMO-</code> y se borran con un clic.</p>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary" id="demoCreate"><i class="bi bi-magic me-1"></i>Crear pacientes de ejemplo</button>
+              <button class="btn btn-outline-danger" id="demoDelete"><i class="bi bi-trash me-1"></i>Borrar ejemplos</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="col-lg-6">
@@ -128,6 +139,23 @@
               </div>` : ''}
           </div>`).join('') || '<div class="empty small">Sin miembros</div>';
       }
+
+      if (!canManage) $('demoCard').classList.add('d-none');
+      $('demoCreate').onclick = async () => {
+        $('demoCreate').disabled = true;
+        try {
+          const r = await App.api('/demo', { method: 'POST' });
+          App.toast(`${r.patients} pacientes de ejemplo creados, con citas para los próximos días`);
+        } catch (err) { App.fail(err); }
+        $('demoCreate').disabled = false;
+      };
+      $('demoDelete').onclick = async () => {
+        if (!(await App.confirmAction('¿Borrar los pacientes de ejemplo con sus consultas, citas y datos?'))) return;
+        try {
+          const r = await App.api('/demo', { method: 'DELETE' });
+          App.toast(r.deleted ? `${r.deleted} pacientes de ejemplo borrados` : 'No había pacientes de ejemplo');
+        } catch (err) { App.fail(err); }
+      };
 
       App.onSubmit($('businessForm'), async (d) => {
         await App.api('/business', { method: 'PUT', body: d });

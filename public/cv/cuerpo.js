@@ -351,28 +351,37 @@ const INTER = [
   { k:'dulce', n:'Azúcares y dulces', col:'--bad', por:'Solo dentro de la meta de dulce semanal', rows:[
     { q:'2 cdas soperas rasas', it:[['Azúcar']] }, { q:'1 cda sopera rasa', it:[['Mermelada'],['Miel'],['Lecherita'],['Arequipe'],['Panela molida']] }, { q:'1 und pequeña', it:[['Bocadillo']] } ] },
 ];
+// Plantilla para pacientes sin plan: cada componente elige sus alimentos de la lista de intercambios.
 const PLAN = [
-  { id:'des', ab:'DE', n:'Desayuno', h:'9:30', c:[ ['prot','Proteína','2 huevos + queso o jamón'], ['carb','Harina','1 porción'] ] },
-  { id:'mm', ab:'MM', n:'Media mañana', c:[ ['','Bebida','Agua'], ['fruta','Fruta','1 porción, de las recomendadas'], ['','Opcional','Gelatina o limonada'] ] },
-  { id:'alm', ab:'AL', n:'Almuerzo', c:[ ['prot','Proteína','125 g de carne o 150 g de granos'], ['carb','Harina','1 porción'], ['verd','Verduras','100 g o 1 bowl'], ['grasa','Grasa','Aceite de oliva o aguacate'], ['','Bebida','Agua'] ] },
-  { id:'mt', ab:'MT', n:'Media tarde', note:'Pre-entreno', c:[ ['fruta','Fruta','1 porción'], ['','Más uno de','Almendras (1 puñado) · yogur griego (3 cdas) · queso · galleta de avena · waffle + galleta de arroz'] ] },
-  { id:'cena', ab:'CE', n:'Cena', c:[ ['prot','Proteína','125 g de carne, 150 g de granos o 2 huevos'], ['carb','Harina','1 porción'], ['verd','Verduras','Opcional'] ] },
+  { id:'des', ab:'DE', n:'Desayuno', h:'7:30', c:[ ['prot','Proteína','',{ n:2, foods:['Huevo','Queso o cuajada','Jamón'] }], ['carb','Harina','',{ n:1, foods:['Arepa delgada','Pan','Tostada'] }] ] },
+  { id:'mm', ab:'MM', n:'Media mañana', c:[ ['','Bebida','Agua'], ['fruta','Fruta','',{ n:1, foods:['Manzana','Pera','Fresas'] }] ] },
+  { id:'alm', ab:'AL', n:'Almuerzo', h:'12:30', c:[ ['prot','Proteína','',{ n:1, foods:['Pollo sin piel','Pescado','Res'] }], ['carb','Harina','',{ n:1, foods:['Arroz o cebada','Papa criolla'] }], ['verd','Verduras','',{ n:1, foods:['Brócoli','Zanahoria','Lechuga'] }], ['grasa','Grasa','',{ n:1, foods:['Aceite','Aguacate'] }], ['','Bebida','Agua'] ] },
+  { id:'mt', ab:'MT', n:'Media tarde', c:[ ['fruta','Fruta','',{ n:1, foods:[] }], ['secos','Frutos secos','',{ n:1, foods:['Almendras','Nueces'] }] ] },
+  { id:'cena', ab:'CE', n:'Cena', h:'19:00', c:[ ['prot','Proteína','',{ n:1, foods:['Pollo sin piel','Huevo','Atún'] }], ['carb','Harina','',{ n:1, foods:['Arepa delgada','Papa común'] }], ['verd','Verduras','Opcional',{ n:1, foods:[] }] ] },
 ];
 const done = new Set(['des','mm']); let agua = 3, aguaU = 'vasos';
 const openOpts = new Set();
 const META = [ { id:'dulce', n:'Dulce', d:'1 vez por semana, en plan social', max:1, used:0 }, { id:'grasas', n:'Comida grasosa', d:'2 veces al mes', max:2, used:1 } ];
-const ST_TXT = { '':'Permitido', pref:'Recomendado', lim:'Con moderación', evitar:'Evitar' };
-const ST_NEXT = { '':'pref', pref:'lim', lim:'evitar', evitar:'' };
+// Cinco estados de la lista de intercambios ('' = permitido).
+const ST_ORDER = ['pref', '', 'lim', 'salud', 'evitar'];
+const ST_TXT = { pref:'Recomendado', '':'Permitido', lim:'Con moderación', salud:'Limitar por su salud', evitar:'Evitar' };
+const ST_RANK = { pref:0, '':1, lim:2, salud:3, evitar:4 };
 function chipItem([n, st = ''], gi, ri, ii){
-  const fl = foodFlags()[n];
-  if (fl) return `<button type="button" class="st ${st}" data-x="${gi}.${ri}.${ii}" title="${ST_TXT[st]} · Para este paciente: ${fl}" aria-label="${n}: ${ST_TXT[st]}, ${fl}">${n}<span class="flag">!</span></button>`;
-  return `<button type="button" class="st ${st}" data-x="${gi}.${ri}.${ii}" title="${ST_TXT[st]}" aria-label="${n}: ${ST_TXT[st]}">${n}</button>`;
+  const fl = foodFlags()[n], tip = `${ST_TXT[st]}${fl ? ' · Para este paciente: ' + fl : ''}`, flag = fl ? '<span class="flag">!</span>' : '';
+  if (S.rol !== 'nutri') return `<span class="st ${st}" title="${esc(tip)}">${esc(n)}${flag}</span>`;
+  return `<span class="st st-wrap ${st}"><button type="button" class="st-name" data-x="${gi}.${ri}.${ii}" title="${esc(tip)} · toca para cambiar" aria-label="${esc(n)}: ${ST_TXT[st]}. Cambiar estado">${esc(n)}${flag}</button><button type="button" class="st-x" data-xdel="${gi}.${ri}.${ii}" aria-label="Eliminar ${esc(n)}">×</button></span>`;
 }
 function optionsFor(k){
   const all = [];
   INTER.forEach(g => { if (g.k === k) g.rows.forEach(r => r.it.forEach(it => all.push({ n:it[0], st:it[1] || '', q:r.q }))); });
-  const order = { pref:0, '':1, lim:2, evitar:3 };
-  return all.sort((a,b) => order[a.st] - order[b.st]);
+  return all.sort((a,b) => ST_RANK[a.st] - ST_RANK[b.st]);
+}
+// Texto de un componente: porciones + alimentos elegidos de la lista de intercambios + detalle libre.
+function compText([k, lab, val, sel]){
+  const foods = sel?.foods || [], n = sel?.n;
+  const por = n ? `${fmt(n, n % 1 ? 1 : 0)} ${n == 1 ? 'porción' : 'porciones'}` : '';
+  const main = por && foods.length ? `${por}: ${foods.join(', ')}` : foods.length ? foods.join(', ') : por;
+  return [main, val].filter(Boolean).join(' · ') || '—';
 }
 function renderPlan(){
   persistAll();
@@ -385,12 +394,12 @@ function renderPlan(){
     const d = document.createElement('div'); d.className = 'meal' + (done.has(m.id) ? ' done' : '');
     d.innerHTML = `<div class="meal-head"><div class="tag">${esc(m.ab)}</div><div class="grow"><h4>${esc(m.n)}</h4><small>${esc([m.h, m.note].filter(Boolean).join(' · ') || 'Sin hora fija')}</small></div>
       <button class="check" aria-pressed="${done.has(m.id)}" aria-label="Marcar ${m.n} como cumplido">✓</button></div>` +
-      m.c.map(([k, lab, val], ci) => {
+      m.c.map(([k, lab, val, sel], ci) => {
         const key = `${m.id}.${ci}`, op = openOpts.has(key);
-        const opts = k && op ? `<div class="opts">${optionsFor(k).map(o => { const fl = foodFlags()[o.n]; return `<span class="st ${o.st}" title="${o.q}${fl ? ' · ' + fl : ''}">${o.n}${fl ? '<span class="flag">!</span>' : ''}</span>`; }).join('')}</div>` : '';
-        return `<div class="comp"><div class="lab ${k}">${esc(lab)}</div><div><div class="val"></div>${k ? `<button class="opts-btn" data-o="${key}">${op ? 'Ocultar opciones' : 'Ver opciones'}</button>` : ''}${opts}</div></div>`;
+        const opts = k && op ? `<div class="opts">${optionsFor(k).filter(o => o.st !== 'evitar').map(o => { const fl = foodFlags()[o.n]; return `<span class="st ${o.st}" title="${o.q}${fl ? ' · ' + fl : ''}">${o.n}${fl ? '<span class="flag">!</span>' : ''}</span>`; }).join('')}</div>` : '';
+        return `<div class="comp"><div class="lab ${k}">${esc(lab)}</div><div><div class="val"></div>${k ? `<button class="opts-btn" data-o="${key}">${op ? 'Ocultar intercambios' : 'Ver intercambios'}</button>` : ''}${opts}</div></div>`;
       }).join('');
-    m.c.forEach(([, , val], ci) => d.querySelectorAll('.val')[ci].textContent = val);
+    m.c.forEach((c, ci) => d.querySelectorAll('.val')[ci].textContent = compText(c));
     d.querySelector('.check').onclick = () => { done.has(m.id) ? done.delete(m.id) : done.add(m.id); renderPlan(); if (done.size === PLAN.length) { burst(); toast('Cumpliste todos los tiempos de comida de hoy'); } };
     d.querySelectorAll('.opts-btn').forEach(b => b.onclick = () => { const k = b.dataset.o; openOpts.has(k) ? openOpts.delete(k) : openOpts.add(k); renderPlan(); });
     box.appendChild(d);
@@ -414,23 +423,24 @@ function renderPlan(){
   requestAnimationFrame(() => $('#bfill').style.height = `${Math.min(agua / nv, 1) * 100}%`);
   // intercambios
   const nut = S.rol === 'nutri';
-  $('#interHint').textContent = nut ? (editPlan ? 'Toca un alimento para cambiar su estado. Para quitarlo, llévalo hasta "Evitar" y tócalo otra vez. Abajo de cada grupo puedes agregar alimentos.' : 'Toca un alimento para cambiar su estado: recomendado, con moderación, evitar o permitido.') : 'Cada alimento equivale a 1 porción en la cantidad indicada. Prefiere los resaltados.';
+  $('#interHint').textContent = nut ? 'Toca un alimento para elegir su estado o la × para quitarlo. Los tiempos de comida eligen sus alimentos de esta lista.' : 'Cada alimento equivale a 1 porción en la cantidad indicada. Prefiere los resaltados.';
   $('#xgroups').innerHTML = INTER.map((g,gi) => `<div class="xg"><h4><i style="background:var(${g.col})"></i>${g.n}</h4><div class="por">${g.por}</div>` +
     g.rows.map((r,ri) => `<div class="xrow">${r.it.map((it,ii) => chipItem(it, gi, ri, ii)).join('')}<span class="q">${esc(r.q)}</span>${r.note ? `<span class="xnote">${esc(r.note)}</span>` : ''}</div>`).join('') +
-    (editPlan && nut ? `<div class="xadd"><input class="tin" data-xg="${gi}" placeholder="Nuevo alimento" aria-label="Nuevo alimento para ${g.n}"><input class="tin" data-xq="${gi}" placeholder="Porción, ej. 1 und" aria-label="Porción" style="max-width:150px"><button class="btn btn-outline-secondary btn-sm" data-xadd="${gi}">Agregar</button></div>` : '') + `</div>`).join('');
+    (nut ? `<div class="xadd"><input class="tin" data-xg="${gi}" placeholder="Nuevo alimento" aria-label="Nuevo alimento para ${g.n}"><input class="tin" data-xq="${gi}" placeholder="Porción, ej. 1 und" aria-label="Porción" style="max-width:150px"><button class="btn btn-outline-secondary btn-sm" data-xadd="${gi}"><i class="bi bi-plus-lg me-1"></i>Agregar</button></div>` : '') + `</div>`).join('');
   $$('#xgroups [data-xadd]').forEach(b => b.onclick = () => {
     const gi = Number(b.dataset.xadd), n = $(`[data-xg="${gi}"]`).value.trim(), q = $(`[data-xq="${gi}"]`).value.trim() || '1 porción';
     if (!n){ toast('Escribe el nombre del alimento'); return; }
     const g = INTER[gi]; let row = g.rows.find(r => r.q.toLowerCase() === q.toLowerCase());
     if (!row){ row = { q, it:[] }; g.rows.push(row); }
-    row.it.push([n, 'pref']); renderPlan(); toast(`${n} agregado a ${g.n}`);
+    row.it.push([n, '']); renderPlan(); toast(`${n} agregado a ${g.n}`);
   });
-  $$('#xgroups button.st').forEach(b => b.onclick = () => {
-    if (S.rol !== 'nutri') return;
-    const [gi, ri, ii] = b.dataset.x.split('.').map(Number), row = INTER[gi].rows[ri], it = row.it[ii];
-    if (editPlan && it[1] === 'evitar'){ row.it.splice(ii, 1); if (!row.it.length) INTER[gi].rows.splice(ri, 1); renderPlan(); toast(`${it[0]} quitado de la lista`); return; }
-    it[1] = ST_NEXT[it[1] || '']; renderPlan();
-    toast(`${it[0]}: ${ST_TXT[it[1]]}`);
+  $$('#xgroups [data-x]').forEach(b => b.onclick = e => { e.stopPropagation(); openStateMenu(b, ...b.dataset.x.split('.').map(Number)); });
+  $$('#xgroups [data-xdel]').forEach(b => b.onclick = () => {
+    const [gi, ri, ii] = b.dataset.xdel.split('.').map(Number), row = INTER[gi].rows[ri], [name] = row.it[ii];
+    row.it.splice(ii, 1); if (!row.it.length) INTER[gi].rows.splice(ri, 1);
+    // Sincronía: el alimento también sale de los tiempos de comida que lo tenían elegido.
+    PLAN.forEach(m => m.c.forEach(c => { if (c[3]?.foods) c[3].foods = c[3].foods.filter(f => f !== name); }));
+    renderPlan(); toast(`${name} quitado de la lista`);
   });
 }
 
@@ -462,39 +472,117 @@ const from24 = v => { if (!v) return ''; const [a,b] = v.split(':'); return `${N
 function renderPlanEdit(box){
   PLAN.forEach((m, mi) => {
     const d = document.createElement('div'); d.className = 'meal editing';
-    d.innerHTML = `<div class="meal-head"><div class="tag">${esc(abbr(m.n))}</div>
-        <div class="grow egrid">
-          <label class="ef"><span>Nombre</span><input class="tin" data-f="n" value="${esc(m.n)}"></label>
-          <label class="ef" style="max-width:130px"><span>Hora</span><input class="tin" type="time" data-f="h" value="${to24(m.h)}"></label>
-          <label class="ef"><span>Nota</span><input class="tin" data-f="note" value="${esc(m.note || '')}" placeholder="Ej. Pre-entreno"></label>
-        </div>
-        <div class="mtools"><button class="btn btn-outline-secondary btn-sm" data-mv="-1" ${mi === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button class="btn btn-outline-secondary btn-sm" data-mv="1" ${mi === PLAN.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button><button class="btn btn-outline-danger btn-sm" data-delm aria-label="Eliminar ${esc(m.n)}">Eliminar</button></div></div>
-      <div class="ecomps">${m.c.map(([k, lab, val], ci) => `<div class="ecomp">
-          <select class="tin" data-ci="${ci}" data-f="lab" aria-label="Tipo">${CTYPES.map(([kk, l]) => `<option ${l === lab ? 'selected' : ''}>${l}</option>`).join('')}${CTYPES.some(t => t[1] === lab) ? '' : `<option selected>${esc(lab)}</option>`}</select>
-          <input class="tin" data-ci="${ci}" data-f="val" value="${esc(val)}" placeholder="Porción o alimentos, ej. 125 g de pollo" aria-label="Detalle">
-          <button class="rm-c" data-delc="${ci}" aria-label="Quitar componente">×</button></div>`).join('')}</div>
-      <button class="addc" data-addc>+ Agregar componente</button>`;
-    // cambios de texto: se guardan al escribir, sin redibujar (no se pierde el foco)
-    d.querySelectorAll('[data-f="n"],[data-f="h"],[data-f="note"]').forEach(i => i.addEventListener('input', () => {
-      const f = i.dataset.f; m[f] = f === 'h' ? from24(i.value) : i.value; m.ab = abbr(m.n); d.querySelector('.tag').textContent = m.ab;
-    }));
-    d.querySelectorAll('[data-ci]').forEach(i => i.addEventListener(i.tagName === 'SELECT' ? 'change' : 'input', () => {
-      const c = m.c[Number(i.dataset.ci)];
-      if (i.dataset.f === 'lab'){ c[1] = i.value; c[0] = (CTYPES.find(t => t[1] === i.value) || [''])[0]; } else c[2] = i.value;
-    }));
-    d.querySelectorAll('[data-delc]').forEach(b => b.onclick = () => { m.c.splice(Number(b.dataset.delc), 1); renderPlan(); });
-    d.querySelector('[data-addc]').onclick = () => { m.c.push(['', 'Otro', '']); renderPlan(); setTimeout(() => { const ins = box.querySelectorAll('.meal')[mi].querySelectorAll('[data-f="val"]'); ins[ins.length - 1]?.focus(); }, 0); };
+    d.innerHTML = `<div class="meal-head"><div class="tag">${esc(m.ab || abbr(m.n))}</div><div class="grow"><h4>${esc(m.n)}</h4><small>${esc([m.h, m.note].filter(Boolean).join(' · ') || 'Sin hora fija')}</small></div>
+        <div class="mtools">
+          <button class="btn btn-outline-secondary btn-sm" data-mv="-1" ${mi === 0 ? 'disabled' : ''} aria-label="Subir"><i class="bi bi-arrow-up"></i></button>
+          <button class="btn btn-outline-secondary btn-sm" data-mv="1" ${mi === PLAN.length - 1 ? 'disabled' : ''} aria-label="Bajar"><i class="bi bi-arrow-down"></i></button>
+          <button class="btn btn-primary btn-sm" data-edit><i class="bi bi-pencil me-1"></i>Editar</button>
+          <button class="btn btn-outline-danger btn-sm" data-delm aria-label="Eliminar ${esc(m.n)}"><i class="bi bi-trash"></i></button>
+        </div></div>` +
+      (m.c.length ? m.c.map(c => `<div class="comp"><div class="lab ${c[0]}">${esc(c[1])}</div><div class="val">${esc(compText(c))}</div></div>`).join('')
+        : '<p class="empty" style="margin-top:10px">Aún no tiene componentes. Toca Editar.</p>');
+    d.querySelector('[data-edit]').onclick = () => openMealModal(mi);
     d.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const j = mi + Number(b.dataset.mv); [PLAN[mi], PLAN[j]] = [PLAN[j], PLAN[mi]]; renderPlan(); });
     d.querySelector('[data-delm]').onclick = () => {
-      if (d.dataset.confirm){ PLAN.splice(mi, 1); done.delete(m.id); renderPlan(); toast(`${m.n} eliminado del plan`); return; }
-      d.dataset.confirm = '1'; const b = d.querySelector('[data-delm]'); b.textContent = '¿Eliminar? Toca otra vez'; setTimeout(() => { if (b.isConnected){ b.textContent = 'Eliminar'; delete d.dataset.confirm; } }, 3000);
+      if (!confirm(`¿Eliminar ${m.n} del plan?`)) return;
+      PLAN.splice(mi, 1); done.delete(m.id); renderPlan(); toast(`${m.n} eliminado del plan`);
     };
     box.appendChild(d);
   });
-  const add = document.createElement('button'); add.className = 'addmeal'; add.textContent = '+ Agregar tiempo de comida';
-  add.onclick = () => { PLAN.push({ id:'m' + Date.now(), n:'Nuevo tiempo', ab:'NT', h:'', c:[['prot','Proteína','']] }); renderPlan(); setTimeout(() => { const ms = box.querySelectorAll('.meal'); ms[ms.length - 1].querySelector('[data-f="n"]').select(); }, 0); };
+  const add = document.createElement('button'); add.className = 'addmeal'; add.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Agregar tiempo de comida';
+  add.onclick = () => { PLAN.push({ id:'m' + Date.now(), n:'Nuevo tiempo', ab:'NT', h:'', c:[['prot', 'Proteína', '', { n:1, foods:[] }]] }); openMealModal(PLAN.length - 1, true); };
   box.appendChild(add);
 }
+
+// ---------- modal para editar un tiempo de comida ----------
+function compEditor(c, i){
+  const [k, lab, val, sel] = c, opts = k ? optionsFor(k) : [], flags = foodFlags();
+  return `<div class="mc-comp" data-i="${i}">
+    <div class="mc-row">
+      <label class="mc-f"><span>Tipo</span><select class="form-select form-select-sm" data-c="lab">${CTYPES.map(([, l]) => `<option ${l === lab ? 'selected' : ''}>${l}</option>`).join('')}${CTYPES.some(t => t[1] === lab) ? '' : `<option selected>${esc(lab)}</option>`}</select></label>
+      ${k ? `<label class="mc-f mc-n"><span>Porciones</span><input type="number" min="0" max="20" step="0.5" class="form-control form-control-sm" data-c="n" value="${sel?.n ?? ''}"></label>` : ''}
+      <button type="button" class="btn btn-sm btn-outline-danger mc-del" data-del aria-label="Quitar componente"><i class="bi bi-x-lg"></i></button>
+    </div>
+    ${k ? `<div class="mc-hint">Elige de la lista de intercambios${opts.length ? '' : ' (este grupo no tiene alimentos)'}:</div>
+      <div class="mc-foods">${opts.map(o => `<button type="button" class="st ${o.st} ${sel?.foods?.includes(o.n) ? 'picked' : ''}" data-food="${esc(o.n)}" ${o.st === 'evitar' ? 'disabled title="Marcado como Evitar"' : `title="${esc(o.q)}"`}>${esc(o.n)}${flags[o.n] ? '<span class="flag">!</span>' : ''}</button>`).join('')}</div>` : ''}
+    <input class="form-control form-control-sm mt-2" data-c="val" value="${esc(val || '')}" placeholder="${k ? 'Detalle opcional, ej. a la plancha' : 'Ej. agua, gelatina o limonada'}">
+  </div>`;
+}
+function openMealModal(mi, isNew = false){
+  const draft = JSON.parse(JSON.stringify(PLAN[mi]));
+  let dlg = $('#mealDlg');
+  if (!dlg){ dlg = document.createElement('dialog'); dlg.id = 'mealDlg'; dlg.className = 'cv-modal'; document.body.appendChild(dlg); }
+  dlg.innerHTML = `<form method="dialog" class="cv-modal-box">
+      <div class="cv-modal-head"><h3>${isNew ? 'Nuevo tiempo de comida' : 'Editar tiempo de comida'}</h3><button type="button" class="btn-close" data-close aria-label="Cerrar"></button></div>
+      <div class="cv-modal-body">
+        <div class="mc-row">
+          <label class="mc-f" style="flex:2"><span>Nombre</span><input class="form-control" data-m="n" value="${esc(draft.n)}" required maxlength="40"></label>
+          <label class="mc-f" style="max-width:130px"><span>Hora</span><input class="form-control" type="time" data-m="h" value="${to24(draft.h)}"></label>
+        </div>
+        <label class="mc-f"><span>Nota</span><input class="form-control" data-m="note" value="${esc(draft.note || '')}" placeholder="Ej. pre-entreno" maxlength="60"></label>
+        <div class="mc-title">Lo que lleva</div>
+        <div id="mcComps" class="d-flex flex-column gap-2"></div>
+        <button type="button" class="btn btn-outline-secondary btn-sm align-self-start" data-add><i class="bi bi-plus-lg me-1"></i>Agregar componente</button>
+      </div>
+      <div class="cv-modal-foot"><button type="button" class="btn btn-outline-secondary" data-close>Cancelar</button><button type="submit" value="ok" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Guardar</button></div>
+    </form>`;
+  const comps = () => { dlg.querySelector('#mcComps').innerHTML = draft.c.map(compEditor).join('') || '<p class="empty">Agrega lo que lleva esta comida.</p>'; };
+  comps();
+  const compOf = el => draft.c[Number(el.closest('.mc-comp')?.dataset.i)];
+  dlg.oninput = e => {
+    const t = e.target;
+    if (t.dataset.m) draft[t.dataset.m] = t.dataset.m === 'h' ? from24(t.value) : t.value;
+    else if (t.dataset.c === 'n'){ const c = compOf(t); c[3] = { ...(c[3] || { foods:[] }), n:t.value === '' ? null : clamp(Number(t.value), 0, 20) }; }
+    else if (t.dataset.c === 'val') compOf(t)[2] = t.value;
+  };
+  dlg.onchange = e => {
+    if (e.target.dataset.c !== 'lab') return;
+    const c = compOf(e.target), k = (CTYPES.find(t => t[1] === e.target.value) || [''])[0];
+    c[1] = e.target.value;
+    if (k !== c[0]){ c[0] = k; c[3] = k ? { n:c[3]?.n ?? 1, foods:[] } : undefined; comps(); }
+  };
+  dlg.onclick = e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.close !== undefined) dlg.close('cancel');
+    else if (t.dataset.food !== undefined){
+      const c = compOf(t); c[3] = c[3] || { n:1, foods:[] };
+      const f = c[3].foods, name = t.dataset.food, i = f.indexOf(name);
+      i >= 0 ? f.splice(i, 1) : f.push(name); t.classList.toggle('picked', i < 0);
+    } else if (t.dataset.del !== undefined){ draft.c.splice(Number(t.closest('.mc-comp').dataset.i), 1); comps(); }
+    else if (t.dataset.add !== undefined){ draft.c.push(['prot', 'Proteína', '', { n:1, foods:[] }]); comps(); dlg.querySelector('.cv-modal-body').scrollTo({ top:1e6, behavior:'smooth' }); }
+  };
+  dlg.onclose = () => {
+    if (dlg.returnValue === 'ok'){
+      draft.n = (draft.n || '').trim() || 'Tiempo de comida'; draft.ab = abbr(draft.n);
+      draft.c = draft.c.filter(c => c[0] || c[2]);  // sin tipo de intercambio ni detalle, no aporta
+      PLAN[mi] = draft; renderPlan(); toast(`${draft.n} guardado`);
+    } else if (isNew){ PLAN.splice(mi, 1); renderPlan(); }
+  };
+  dlg.returnValue = '';
+  dlg.showModal();
+}
+
+// ---------- menú de estado de un alimento (lista de intercambios) ----------
+let stMenu = null;
+function closeStateMenu(){ stMenu?.remove(); stMenu = null; document.removeEventListener('click', outsideStateMenu); }
+function outsideStateMenu(e){ if (stMenu && !stMenu.contains(e.target)) closeStateMenu(); }
+function openStateMenu(btn, gi, ri, ii){
+  closeStateMenu();
+  const it = INTER[gi].rows[ri].it[ii], cur = it[1] || '';
+  stMenu = document.createElement('div'); stMenu.className = 'st-menu'; stMenu.setAttribute('role', 'menu');
+  stMenu.innerHTML = `<div class="st-menu-title">${esc(it[0])}</div>` + ST_ORDER.map(k =>
+    `<button type="button" role="menuitemradio" aria-checked="${cur === k}" data-st="${k}"><span class="st ${k}">${ST_TXT[k]}</span>${cur === k ? '<i class="bi bi-check2"></i>' : ''}</button>`).join('');
+  document.body.appendChild(stMenu);
+  const r = btn.getBoundingClientRect(), w = stMenu.offsetWidth || 230;
+  stMenu.style.top = `${r.bottom + window.scrollY + 6}px`;
+  stMenu.style.left = `${Math.max(8, Math.min(r.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - w - 8))}px`;
+  stMenu.onclick = e => {
+    const b = e.target.closest('[data-st]'); if (!b) return;
+    it[1] = b.dataset.st; closeStateMenu(); renderPlan(); toast(`${it[0]}: ${ST_TXT[it[1]]}`);
+  };
+  setTimeout(() => document.addEventListener('click', outsideStateMenu));
+}
+
 function renderGoalsEdit(){
   $('#goals').innerHTML = META.map((g,i) => `<div class="goal editing"><label class="ef"><span>Meta</span><input class="tin" data-gi="${i}" data-f="n" value="${esc(g.n)}"></label>
       <label class="ef"><span>Frecuencia</span><input class="tin" data-gi="${i}" data-f="d" value="${esc(g.d)}"></label>

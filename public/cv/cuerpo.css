@@ -219,9 +219,55 @@ mark.st,.st.pref{background:color-mix(in srgb, var(--good) 26%, transparent);bor
 .xg .por{font-size:12.5px;color:var(--muted);margin-bottom:8px}
 .xrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
 .xrow .q{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:2px}
-button.st{cursor:default}
-.is-nutri button.st{cursor:pointer}
-.is-nutri button.st:hover{outline:2px solid var(--accent);outline-offset:1px}
+button.st{cursor:pointer}
+.st.salud{border-color:var(--bad);background:color-mix(in srgb, var(--bad) 10%, transparent)}
+.st.salud::after{content:" !";color:var(--bad);font-weight:800}
+/* Chip editable (nutricionista): nombre que abre el menú de estado + × para eliminar */
+.st-wrap{display:inline-flex;align-items:center;padding:0;overflow:hidden}
+.st-wrap::after{display:none}
+.st-wrap.evitar{text-decoration:none}
+.st-wrap.evitar .st-name{text-decoration:line-through;text-decoration-color:var(--bad);text-decoration-thickness:2px}
+.st-wrap .st-name{border:0;background:transparent;color:inherit;padding:3px 4px 3px 9px;font:inherit;text-decoration:inherit;text-decoration-color:inherit;text-decoration-thickness:inherit}
+.st-wrap.lim .st-name::after{content:" · poco";color:var(--warn);font-weight:700;font-size:11.5px}
+.st-wrap.salud .st-name::after{content:" !";color:var(--bad);font-weight:800}
+.st-wrap .st-x{border:0;background:transparent;color:var(--muted);padding:0 8px 0 3px;font-size:16px;line-height:1;align-self:stretch}
+.st-wrap .st-x:hover{color:var(--bad)}
+.st-wrap:hover{outline:2px solid var(--accent);outline-offset:1px}
+.st-menu{position:absolute;z-index:1080;min-width:230px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgb(11 31 58 / .2);padding:6px;display:flex;flex-direction:column;animation:cv-pop .18s ease-out}
+.st-menu-title{font-size:12px;font-weight:700;color:var(--muted);padding:4px 8px 6px;letter-spacing:.03em}
+.st-menu button{border:0;background:transparent;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border-radius:9px;text-align:left;color:var(--ink)}
+.st-menu button:hover,.st-menu button[aria-checked="true"]{background:var(--surface-2)}
+.st-menu button .st{cursor:pointer}
+/* Modal de tiempo de comida (en celular, hoja que sube desde abajo) */
+.cv-modal{border:0;padding:0;border-radius:18px;background:var(--surface);color:var(--ink);width:min(680px,calc(100% - 24px));max-width:none;max-height:calc(100dvh - 32px);box-shadow:0 24px 70px rgb(0 0 0 / .32)}
+.cv-modal::backdrop{background:rgb(11 31 58 / .45);backdrop-filter:blur(2px)}
+.cv-modal[open]{animation:cv-pop .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes cv-pop{from{opacity:0;transform:translateY(18px) scale(.98)}}
+.cv-modal-box{display:flex;flex-direction:column;max-height:calc(100dvh - 32px);margin:0}
+.cv-modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.cv-modal-head h3{font-size:18px;margin:0}
+.cv-modal-body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.cv-modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.cv-modal .form-control,.cv-modal .form-select{background-color:var(--surface);border-color:var(--line);color:var(--ink)}
+.mc-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.mc-f{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;margin:0}
+.mc-f > span{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.mc-n{max-width:120px;min-width:90px}
+.mc-title{font-family:var(--display);font-weight:700;font-size:15px;margin-top:4px}
+.mc-comp{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--surface-2)}
+.mc-del{margin-left:auto}
+.mc-hint{font-size:12px;color:var(--muted);margin-top:10px}
+.mc-foods{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mc-foods .st:disabled{opacity:.55;cursor:not-allowed}
+.st.picked{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);border-style:solid;font-weight:600}
+.st.picked::before{content:"✓ ";font-weight:800}
+.st.picked::after{color:inherit}
+@media (max-width:860px){
+  .cv-modal{width:100%;margin:auto 0 0;border-radius:20px 20px 0 0;max-height:92dvh}
+  .cv-modal-box{max-height:92dvh}
+  .cv-modal[open]{animation:cv-sheet .3s cubic-bezier(.2,.8,.2,1)}
+}
+@keyframes cv-sheet{from{transform:translateY(100%)}}
 .xnote{font-size:12.5px;color:var(--muted);font-style:italic}
 
 /* Salud */
