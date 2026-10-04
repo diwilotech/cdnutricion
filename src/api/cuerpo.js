@@ -85,6 +85,23 @@ async function activePortal(c, patientId) {
   return { ...rest, url: token ? await portalUrl(c, token) : null };
 }
 
+// Enlace nuevo del paciente (el anterior deja de funcionar).
+async function createPortal(c, patientId) {
+  const db = tenantDb(c);
+  const token = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  await db.batch([
+    db.prepare(
+      `UPDATE portal_links SET revoked_at = datetime('now') WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL`,
+      c.businessId, patientId,
+    ),
+    db.prepare(
+      'INSERT INTO portal_links (id, business_id, patient_id, created_by, token) VALUES (?, ?, ?, ?, ?)',
+      await sha256Hex(token), c.businessId, patientId, c.user.id, token,
+    ),
+  ]);
+  return portalUrl(c, token);
+}
+
 async function saveProfile(c, patientId, fields) {
   const db = tenantDb(c);
   const sets = [];
@@ -186,20 +203,8 @@ export function routes(r) {
 
   // Enlace privado del paciente: se crea uno nuevo (el anterior deja de funcionar).
   r.post('/api/admin/patients/:id/portal', 'tenant', async (c) => {
-    const db = tenantDb(c);
-    await getPatient(db, c.businessId, c.params.id);
-    const token = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
-    await db.batch([
-      db.prepare(
-        `UPDATE portal_links SET revoked_at = datetime('now') WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL`,
-        c.businessId, c.params.id,
-      ),
-      db.prepare(
-        'INSERT INTO portal_links (id, business_id, patient_id, created_by, token) VALUES (?, ?, ?, ?, ?)',
-        await sha256Hex(token), c.businessId, c.params.id, c.user.id, token,
-      ),
-    ]);
-    return json({ url: await portalUrl(c, token) }, 201);
+    await getPatient(tenantDb(c), c.businessId, c.params.id);
+    return json({ url: await createPortal(c, c.params.id) }, 201);
   });
 
   r.delete('/api/admin/patients/:id/portal', 'tenant', async (c) => {
@@ -223,6 +228,8 @@ export function routes(r) {
     const body = await readJson(c.req);
     const plan = jsonDoc(body.plan, 'plan');
     if (!plan) throw new HttpError(400, 'Falta el plan');
+    // El PDF siempre lleva el QR del seguimiento: si el paciente no tiene enlace reutilizable, se le crea.
+    if (!(await activePortal(c, pid))?.url) await createPortal(c, pid);
     const today = localNow(c.timezone).date;
     const appt = body.appointment_id
       ? await db.first('SELECT id, starts_at FROM appointments WHERE business_id = ? AND patient_id = ? AND id = ?', bid, pid, str(body.appointment_id, { max: 64 }))

@@ -71,7 +71,7 @@ El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`
 hace lo mismo con la cita de hoy. Guarda en `patient_plans` el plan entregado ligado a su cita (de hoy: se actualiza al
 reimprimir; pasada: queda fija) y abre `/admin/plan?v=<id>`, hoja carta con: cómo va (medidas de esa consulta frente a la
 anterior y a la primera), últimos exámenes hasta ese día, comidas, metas, recomendaciones, lo que debe evitar y un QR
-pequeño a su seguimiento; al reverso, la lista de intercambios.
+pequeño a su seguimiento (si el paciente no tiene enlace reutilizable, se le crea al generar el PDF); al reverso, la lista de intercambios.
 
 ### Roles
 

@@ -58,7 +58,7 @@
     .labs .out b::after { content: ' !'; }
     .avoid { margin-top: 10px; padding: 6px 10px; border-left: 3px solid var(--ink); background: var(--tint); }
     .sh-foot { margin-top: auto; padding-top: 10px; display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--line); font-size: 9pt; color: var(--soft); }
-    .sh-foot .qr { width: 22mm; height: 22mm; flex: none; }
+    .sh-foot .qr { width: 24mm; height: 24mm; flex: none; }
     .sh-foot .qr svg { width: 100%; height: 100%; display: block; }
     .sh-foot b { color: var(--ink); }
     .sh-sign { margin-left: auto; text-align: center; min-width: 52mm; }
@@ -310,7 +310,7 @@
       const OPTS = { qr: 'optQr', recs: 'optRecs', prog: 'optProg', labs: 'optLabs', back: 'optBack', sign: 'optSign' };
       try {
         const saved = JSON.parse(localStorage.getItem('cdn.planPrint') || '{}');
-        for (const [k, idv] of Object.entries(OPTS)) if (k in saved) $(idv).checked = saved[k];
+        for (const [k, idv] of Object.entries(OPTS)) if (k in saved && k !== 'qr') $(idv).checked = saved[k];
       } catch { /* sin almacenamiento */ }
       function apply() {
         const state = {};
