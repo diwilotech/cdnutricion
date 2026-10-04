@@ -18,13 +18,10 @@
   <main class="container-xl py-4">
     <h1 class="page-title mb-3">Ajustes</h1>
 
-    <!-- Tarjetas digitales: la de cada profesional y la del consultorio (base). Vista previa idéntica a la pública. -->
+    <!-- Tarjeta digital de cada profesional. La del consultorio (dirección, logo, mapa base) se maneja desde Diwilo Web. -->
     <div class="card mb-3" id="cardSection">
       <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <ul class="nav nav-pills gap-1">
-          <li class="nav-item"><button type="button" class="nav-link active" data-cardtab="me"><i class="bi bi-person-badge me-1"></i>Mi tarjeta</button></li>
-          <li class="nav-item"><button type="button" class="nav-link" data-cardtab="biz"><i class="bi bi-hospital me-1"></i>Consultorio</button></li>
-        </ul>
+        <span class="fw-bold"><i class="bi bi-person-badge me-2"></i>Mi tarjeta digital</span>
         <div class="d-flex gap-2">
           <a class="btn btn-sm btn-outline-secondary" id="cardOpen" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Ver tarjeta</a>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="cardCopy"><i class="bi bi-copy me-1"></i>Copiar enlace</button>
@@ -53,6 +50,26 @@
                 <div class="col-sm-6"><label class="form-label">Correo público</label><input name="email" type="email" class="form-control" maxlength="254" placeholder="Opcional"></div>
                 <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" data-count>0/500</span></label>
                   <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntales a tus pacientes cómo los acompañas"></textarea></div>
+                <div class="col-sm-6"><label class="form-label">Horario</label><input name="hours" class="form-control" maxlength="120" data-fallback="hours"></div>
+                <div class="col-sm-6"><label class="form-label">Dirección donde atiendes</label><input name="address" class="form-control" maxlength="200" data-fallback="address"></div>
+                <div class="col-12">
+                  <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="showMap" name="showMap">
+                    <label class="form-check-label fw-semibold" for="showMap">Mostrar mapa con mi ubicación</label>
+                  </div>
+                  <div id="mapFields" class="vc-panel" hidden>
+                    <div class="small text-body-secondary mb-2">Ubica dónde atiendes de alguna de estas formas:</div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="useLocation"><i class="bi bi-crosshair me-1"></i>Usar mi ubicación actual</button>
+                    <div class="input-group input-group-sm mb-2">
+                      <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                      <input class="form-control" id="mapsLink" placeholder="…o pega aquí el enlace de Google Maps">
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-6"><input name="lat" class="form-control form-control-sm" inputmode="decimal" placeholder="Latitud"></div>
+                      <div class="col-6"><input name="lng" class="form-control form-control-sm" inputmode="decimal" placeholder="Longitud"></div>
+                    </div>
+                  </div>
+                </div>
                 <div class="col-12"><label class="form-label">Dirección de tu tarjeta</label>
                   <div class="input-group"><span class="input-group-text small" id="meHandlePrefix"></span>
                     <input name="handle" class="form-control" maxlength="40" pattern="[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?" autocomplete="off" spellcheck="false"></div></div>
@@ -63,59 +80,10 @@
                   <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addlink><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
                 </div>
               </div>
-              <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>La dirección, el mapa y el horario se toman de la tarjeta del <b>Consultorio</b>. Si no pones enlaces propios, se muestran los del consultorio.</div>
+              <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Lo que dejes vacío (WhatsApp, horario, dirección, mapa o enlaces) se toma del consultorio.</div>
               <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar mi tarjeta</button>
             </form>
 
-            <!-- Consultorio (propietario y administradores) -->
-            <form id="cardForm" class="cdn-enter" novalidate hidden>
-              <fieldset id="cardFields">
-                <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="logo-edit" data-photo><i class="bi bi-person-arms-up"></i></div>
-                <div>
-                  <div class="fw-semibold mb-1">Foto o logo del consultorio</div>
-                  <div class="d-flex gap-2 flex-wrap">
-                    <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-camera me-1"></i>Cambiar foto<input type="file" data-photo-input accept="image/*" hidden></label>
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-photo-remove hidden><i class="bi bi-trash"></i></button>
-                  </div>
-                  <div class="form-text">Se recorta en cuadrado. También es el ícono cuando instalan la tarjeta del consultorio.</div>
-                </div>
-              </div>
-                <div class="row g-3">
-                  <div class="col-sm-6"><label class="form-label">Especialidad</label><input name="specialty" class="form-control" maxlength="80" placeholder="Centro de nutrición clínica"></div>
-                  <div class="col-sm-6"><label class="form-label">Horario</label><input name="hours" class="form-control" maxlength="120" placeholder="Lun a Vie · 7:00 a. m. – 6:00 p. m."></div>
-                  <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" data-count>0/500</span></label>
-                    <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntales a tus pacientes quiénes son"></textarea></div>
-                  <div class="col-12"><label class="form-label">Dirección</label><input name="address" class="form-control" maxlength="200" placeholder="Cra. 43A #1-50, consultorio 302, Medellín"></div>
-                  <div class="col-12">
-                    <div class="form-check form-switch mb-2">
-                      <input class="form-check-input" type="checkbox" id="showMap" name="showMap">
-                      <label class="form-check-label fw-semibold" for="showMap">Mostrar mapa en las tarjetas</label>
-                    </div>
-                    <div id="mapFields" class="vc-panel" hidden>
-                      <div class="small text-body-secondary mb-2">Ubica el consultorio de alguna de estas formas:</div>
-                      <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="useLocation"><i class="bi bi-crosshair me-1"></i>Usar mi ubicación actual</button>
-                      <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                        <input class="form-control" id="mapsLink" placeholder="…o pega aquí el enlace de Google Maps del consultorio">
-                      </div>
-                      <div class="row g-2">
-                        <div class="col-6"><input name="lat" class="form-control form-control-sm" inputmode="decimal" placeholder="Latitud"></div>
-                        <div class="col-6"><input name="lng" class="form-control form-control-sm" inputmode="decimal" placeholder="Longitud"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-12">
-                  <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1"><span>Enlaces</span>
-                    <span class="d-flex gap-1 flex-wrap" data-presets></span></label>
-                  <div data-rows class="d-flex flex-column gap-2"></div>
-                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addlink><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
-                </div>
-                </div>
-                <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>El nombre, el teléfono (WhatsApp) y el correo se toman de <b>Datos del negocio</b>. La dirección, el mapa y el horario aparecen también en la tarjeta de cada profesional.</div>
-                <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar tarjeta del consultorio</button>
-              </fieldset>
-            </form>
           </div>
           <div class="col-lg-5">
             <div class="preview-sticky">
@@ -135,12 +103,9 @@
             <fieldset id="businessFields">
               <div class="mb-3"><label class="form-label">Nombre *</label><input name="name" class="form-control" required maxlength="120"></div>
               <div class="mb-3">
-                <label class="form-label" for="slugInput">Dirección del consultorio</label>
-                <div class="input-group">
-                  <span class="input-group-text small" id="slugPrefix"></span>
-                  <input name="slug" id="slugInput" class="form-control" pattern="[a-z0-9](?:[a-z0-9\-]{0,48}[a-z0-9])?" maxlength="50" autocomplete="off" spellcheck="false">
-                </div>
-                <div class="form-text" id="slugHelp">Solo minúsculas, números y guiones. Ej.: <code>mateo-londono</code>. Al cambiarla, los enlaces anteriores dejan de funcionar.</div>
+                <label class="form-label">Dirección del consultorio</label>
+                <div class="input-group"><span class="input-group-text small"><i class="bi bi-link-45deg"></i></span><input class="form-control" id="slugView" readonly></div>
+                <div class="form-text">La dirección del consultorio se administra desde Diwilo.</div>
                 <div class="d-flex gap-2 flex-wrap mt-2" id="slugLinks"></div>
               </div>
               <div class="row g-3 mb-3">
@@ -216,9 +181,7 @@
       async function loadBusiness() {
         const d = await App.api('/business');
         App.fillForm($('businessForm'), d.business);
-        $('slugPrefix').textContent = `${location.host}/`;
-        $('slugInput').disabled = me.session.role !== 'owner';
-        if (me.session.role !== 'owner') $('slugHelp').textContent = 'Solo el propietario puede cambiar la dirección.';
+        $('slugView').value = `${location.host}/${d.business.slug}`;
         const pub = `${location.origin}/${d.business.slug}`;
         $('slugLinks').innerHTML = `
           <a class="btn btn-sm btn-outline-secondary" href="${pub}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Página pública</a>
@@ -337,142 +300,125 @@
         });
       }
 
-      let biz = null, mine = null, tab = 'me', previewTimer;
-      const editors = {};
+      let biz = null, mine = null, previewTimer;
+      const form = $('meForm'), q = (sel) => form.querySelector(sel);
 
-      // Enlaces, foto y vista previa en vivo, iguales para las dos tarjetas.
-      function setupEditor(key, form, { photoEndpoint, getPhoto, setPhoto, canEdit }) {
-        const q = (sel) => form.querySelector(sel);
-        q('[data-presets]').innerHTML = LINK_PRESETS.map(([n, u]) => `<button type="button" class="btn btn-sm btn-light py-0 px-2" data-preset="${n}|${u}"><i class="bi ${CardView.linkIcon(u + 'x')} me-1"></i>${n}</button>`).join('');
-        const full = () => form.querySelectorAll('[data-link]').length >= 8 && (App.toast('Máximo 8 enlaces', 'warning'), true);
-        q('[data-presets]').onclick = (ev) => {
-          const b = ev.target.closest('[data-preset]'); if (!b || !canEdit() || full()) return;
-          const [label, url] = b.dataset.preset.split('|');
-          q('[data-rows]').insertAdjacentHTML('beforeend', linkRow({ label, url }));
-          const input = q('[data-rows]').lastElementChild.querySelector('[data-l=url]'); input.focus(); input.setSelectionRange(url.length, url.length);
-          preview();
-        };
-        q('[data-addlink]').onclick = () => { if (!canEdit() || full()) return; q('[data-rows]').insertAdjacentHTML('beforeend', linkRow()); q('[data-rows]').lastElementChild.querySelector('input').focus(); preview(); };
-        q('[data-rows]').onclick = (ev) => { if (ev.target.closest('[data-unlink]') && canEdit()) { ev.target.closest('[data-link]').remove(); preview(); } };
-        form.addEventListener('input', preview);
-        form.addEventListener('change', preview);
-        q('[data-photo-input]').onchange = async (ev) => {
-          const file = ev.target.files[0]; ev.target.value = '';
-          if (!file) return;
-          try {
-            const fd = new FormData();
-            fd.append('file', await squarePng(file), 'foto.png');
-            const r = await App.api(photoEndpoint, { method: 'POST', form: fd });
-            setPhoto(r.logo || r.photo); preview(); App.toast('Foto actualizada');
-          } catch (err) { App.fail(err); }
-        };
-        q('[data-photo-remove]').onclick = async () => {
-          if (!(await App.confirmAction('¿Quitar la foto?'))) return;
-          try { await App.api(photoEndpoint, { method: 'DELETE' }); setPhoto(null); preview(); } catch (err) { App.fail(err); }
-        };
-        editors[key] = { form, getPhoto, canEdit };
-      }
-
-      // Datos que verá la tarjeta pública, armados con lo que hay en pantalla.
+      // Datos que verá la tarjeta pública: lo mío, y lo del consultorio donde lo deje vacío.
       function currentCard() {
-        const b = vals($('businessForm'));  // nombre, teléfono y correo del consultorio, en vivo
-        const bf = vals($('cardForm'));
-        const bizCard = {
-          specialty: bf.specialty, bio: bf.bio, hours: bf.hours, address: bf.address, showMap: bf.showMap,
-          lat: bf.lat === '' ? null : Number(bf.lat), lng: bf.lng === '' ? null : Number(bf.lng), links: readLinks($('cardForm')),
-        };
-        const bizName = b.name || biz.name;
-        if (tab === 'biz') return { name: bizName, phone: b.phone ?? biz.phone, email: b.email ?? biz.email, slug: biz.slug, logo: biz.logo, card: bizCard };
-        const m = vals($('meForm')), links = readLinks($('meForm'));
+        const b = vals($('businessForm'));  // nombre y teléfono del consultorio, en vivo
+        const m = vals(form), links = readLinks(form), bc = biz.card || {};
+        const lat = m.lat === '' ? null : Number(m.lat), lng = m.lng === '' ? null : Number(m.lng);
+        const ownLoc = m.address || (lat != null && lng != null);
         return {
-          name: m.displayName || mine.name || bizName, org: bizName, slug: biz.slug, path: `${biz.slug}/${m.handle || mine.handle}`,
+          name: m.displayName || mine.name || b.name, org: b.name || biz.name, slug: biz.slug, path: `${biz.slug}/${mine.handle}`,
           logo: mine.photo, phone: m.phone || b.phone || biz.phone, email: m.email || null,
-          card: { specialty: m.specialty, bio: m.bio, address: bizCard.address, lat: bizCard.lat, lng: bizCard.lng, showMap: bizCard.showMap, hours: bizCard.hours, links: links.length ? links : bizCard.links },
+          card: {
+            specialty: m.specialty, bio: m.bio, hours: m.hours || bc.hours,
+            ...(ownLoc ? { address: m.address, lat, lng, showMap: m.showMap } : { address: bc.address, lat: bc.lat, lng: bc.lng, showMap: bc.showMap }),
+            links: links.length ? links : bc.links || [],
+          },
         };
       }
       function preview() {
         clearTimeout(previewTimer);
         previewTimer = setTimeout(() => {
           if (!biz || !mine) return;
-          const d = currentCard();
-          CardView.render($('cardPreview'), d, { preview: true });
-          $('mapFields').hidden = !$('cardForm').elements.showMap.checked;
-          for (const [key, ed] of Object.entries(editors)) {
-            const photo = ed.getPhoto(), f = ed.form;
-            f.querySelector('[data-photo]').innerHTML = photo ? `<img src="${App.esc(photo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>';
-            f.querySelector('[data-photo-remove]').hidden = !photo || !ed.canEdit();
-            f.querySelector('[data-count]').textContent = `${f.elements.bio.value.length}/500`;
-            f.querySelectorAll('[data-link]').forEach((r) => { r.querySelector('.input-group-text i').className = `bi ${CardView.linkIcon(r.querySelector('[data-l=url]').value)}`; });
-          }
-          const pub = `${location.origin}/${d.path || d.slug}`;
-          $('cardOpen').href = pub;
-          $('cardCopy').onclick = async () => { try { await navigator.clipboard.writeText(pub); App.toast('Enlace de la tarjeta copiado'); } catch { /* sin permiso */ } };
+          CardView.render($('cardPreview'), currentCard(), { preview: true });
+          $('mapFields').hidden = !form.elements.showMap.checked;
+          q('[data-photo]').innerHTML = mine.photo ? `<img src="${App.esc(mine.photo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>';
+          q('[data-photo-remove]').hidden = !mine.photo;
+          q('[data-count]').textContent = `${form.elements.bio.value.length}/500`;
+          form.querySelectorAll('[data-link]').forEach((r) => { r.querySelector('.input-group-text i').className = `bi ${CardView.linkIcon(r.querySelector('[data-l=url]').value)}`; });
         }, 120);
       }
 
-      setupEditor('me', $('meForm'), { photoEndpoint: '/card/me/photo', getPhoto: () => mine?.photo, setPhoto: (u) => (mine.photo = u), canEdit: () => true });
-      setupEditor('biz', $('cardForm'), { photoEndpoint: '/card/logo', getPhoto: () => biz?.logo, setPhoto: (u) => (biz.logo = u), canEdit: () => canManage });
+      // Enlaces (con atajos), foto recortada y vista previa en vivo.
+      q('[data-presets]').innerHTML = LINK_PRESETS.map(([n, u]) => `<button type="button" class="btn btn-sm btn-light py-0 px-2" data-preset="${n}|${u}"><i class="bi ${CardView.linkIcon(u + 'x')} me-1"></i>${n}</button>`).join('');
+      const full = () => form.querySelectorAll('[data-link]').length >= 8 && (App.toast('Máximo 8 enlaces', 'warning'), true);
+      q('[data-presets]').onclick = (ev) => {
+        const b = ev.target.closest('[data-preset]'); if (!b || full()) return;
+        const [label, url] = b.dataset.preset.split('|');
+        q('[data-rows]').insertAdjacentHTML('beforeend', linkRow({ label, url }));
+        const input = q('[data-rows]').lastElementChild.querySelector('[data-l=url]'); input.focus(); input.setSelectionRange(url.length, url.length);
+        preview();
+      };
+      q('[data-addlink]').onclick = () => { if (full()) return; q('[data-rows]').insertAdjacentHTML('beforeend', linkRow()); q('[data-rows]').lastElementChild.querySelector('input').focus(); preview(); };
+      q('[data-rows]').onclick = (ev) => { if (ev.target.closest('[data-unlink]')) { ev.target.closest('[data-link]').remove(); preview(); } };
+      form.addEventListener('input', preview);
+      form.addEventListener('change', preview);
       $('businessForm').addEventListener('input', preview);
+      q('[data-photo-input]').onchange = async (ev) => {
+        const file = ev.target.files[0]; ev.target.value = '';
+        if (!file) return;
+        try {
+          const fd = new FormData();
+          fd.append('file', await squarePng(file), 'foto.png');
+          mine.photo = (await App.api('/card/me/photo', { method: 'POST', form: fd })).photo;
+          preview(); App.toast('Foto actualizada');
+        } catch (err) { App.fail(err); }
+      };
+      q('[data-photo-remove]').onclick = async () => {
+        if (!(await App.confirmAction('¿Quitar tu foto?'))) return;
+        try { await App.api('/card/me/photo', { method: 'DELETE' }); mine.photo = null; preview(); } catch (err) { App.fail(err); }
+      };
+
+      // "Ver tarjeta" y "Copiar enlace" usan la dirección GUARDADA (una sin guardar aún no existe).
+      function paintLinks() {
+        const pub = `${location.origin}/${biz.slug}/${mine.handle}`;
+        $('cardOpen').href = pub;
+        $('cardCopy').onclick = async () => { try { await navigator.clipboard.writeText(pub); App.toast('Enlace de tu tarjeta copiado'); } catch { /* sin permiso */ } };
+      }
 
       async function loadCard() {
         [biz, mine] = await Promise.all([App.api('/card'), App.api('/card/me')]);
-        const c = biz.card || {}, m = mine.card || {};
-        App.fillForm($('cardForm'), { specialty: c.specialty, bio: c.bio, hours: c.hours, address: c.address, showMap: !!c.showMap, lat: c.lat ?? '', lng: c.lng ?? '' });
-        $('cardForm').querySelector('[data-rows]').innerHTML = (c.links || []).map(linkRow).join('');
-        App.fillForm($('meForm'), { displayName: m.displayName || mine.name || '', specialty: m.specialty, phone: m.phone, email: m.email, bio: m.bio, handle: mine.handle });
-        $('meForm').querySelector('[data-rows]').innerHTML = (m.links || []).map(linkRow).join('');
+        const m = mine.card || {}, bc = biz.card || {};
+        App.fillForm(form, {
+          displayName: m.displayName || mine.name || '', specialty: m.specialty, phone: m.phone, email: m.email, bio: m.bio, handle: mine.handle,
+          hours: m.hours, address: m.address, showMap: !!m.showMap, lat: m.lat ?? '', lng: m.lng ?? '',
+        });
+        q('[data-rows]').innerHTML = (m.links || []).map(linkRow).join('');
         $('meHandlePrefix').textContent = `${location.host}/${biz.slug}/`;
-        if (!canManage) $('cardFields').disabled = true;
+        // Lo que no pongas se toma del consultorio: se muestra como sugerencia en cada campo.
+        form.elements.phone.placeholder = biz.phone ? `Del consultorio: ${biz.phone}` : 'Tu número de WhatsApp';
+        form.elements.hours.placeholder = bc.hours ? `Del consultorio: ${bc.hours}` : 'Lun a Vie · 7:00 a. m. – 6:00 p. m.';
+        form.elements.address.placeholder = bc.address ? `Del consultorio: ${bc.address}` : 'Cra. 43A #1-50, consultorio 302';
+        paintLinks();
         preview();
       }
-
-      document.querySelectorAll('[data-cardtab]').forEach((b) => (b.onclick = () => {
-        tab = b.dataset.cardtab;
-        document.querySelectorAll('[data-cardtab]').forEach((x) => x.classList.toggle('active', x === b));
-        $('meForm').hidden = tab !== 'me';
-        $('cardForm').hidden = tab !== 'biz';
-        const f = tab === 'me' ? $('meForm') : $('cardForm');
-        f.classList.remove('cdn-enter'); void f.offsetWidth; f.classList.add('cdn-enter');
-        preview();
-      }));
 
       // Coordenadas desde un enlace de Google Maps (@lat,lng · q=lat,lng · !3dlat!4dlng).
       $('mapsLink').addEventListener('input', (ev) => {
         const v = decodeURIComponent(ev.target.value);
         const m = v.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || v.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || v.match(/[?&](?:q|query|ll|center)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
         if (!m) { if (v.trim()) App.toast(/goo\.gl|maps\.app/.test(v) ? 'Ese es un enlace corto: ábrelo y copia el enlace largo de la barra del navegador' : 'No encontramos coordenadas en ese enlace', 'warning'); return; }
-        $('cardForm').elements.lat.value = m[1]; $('cardForm').elements.lng.value = m[2];
+        form.elements.lat.value = m[1]; form.elements.lng.value = m[2];
         App.toast('Ubicación tomada del enlace'); preview();
       });
       $('useLocation').onclick = () => {
         if (!navigator.geolocation) return App.toast('Tu navegador no permite ubicación', 'error');
         $('useLocation').disabled = true;
         navigator.geolocation.getCurrentPosition((p) => {
-          $('cardForm').elements.lat.value = p.coords.latitude.toFixed(6); $('cardForm').elements.lng.value = p.coords.longitude.toFixed(6);
+          form.elements.lat.value = p.coords.latitude.toFixed(6); form.elements.lng.value = p.coords.longitude.toFixed(6);
           $('useLocation').disabled = false; App.toast('Ubicación actual tomada'); preview();
         }, () => { $('useLocation').disabled = false; App.toast('No pudimos obtener tu ubicación', 'error'); }, { enableHighAccuracy: true, timeout: 10000 });
       };
 
-      App.onSubmit($('cardForm'), async () => {
-        const r = await App.api('/card', { method: 'PUT', body: { card: currentCard().card } });
-        biz.card = r.card;
-        App.toast('Tarjeta del consultorio guardada');
-      });
-      App.onSubmit($('meForm'), async (d) => {
-        const body = { handle: d.handle, card: { displayName: d.displayName, specialty: d.specialty, phone: d.phone, email: d.email, bio: d.bio, links: readLinks($('meForm')) } };
+      App.onSubmit(form, async (d) => {
+        const body = {
+          handle: d.handle,
+          card: { displayName: d.displayName, specialty: d.specialty, phone: d.phone, email: d.email, bio: d.bio,
+            hours: d.hours, address: d.address, showMap: d.showMap, lat: d.lat, lng: d.lng, links: readLinks(form) },
+        };
         const r = await App.api('/card/me', { method: 'PUT', body });
         mine.card = r.card; mine.handle = r.handle;
+        paintLinks();
         App.toast('Tu tarjeta quedó guardada');
         preview();
         loadTeam();
       });
 
       App.onSubmit($('businessForm'), async (d) => {
-        const r = await App.api('/business', { method: 'PUT', body: d });
-        if (r.slug && r.slug !== App.slug) {
-          location.href = `/${r.slug}/admin/ajustes`;  // la dirección cambió: el panel se mueve con ella
-          return;
-        }
+        await App.api('/business', { method: 'PUT', body: d });
         App.toast('Datos guardados');
         loadBusiness();
       });

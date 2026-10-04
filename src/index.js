@@ -140,6 +140,13 @@ self.addEventListener('fetch', (e) => {
 async function handleBusinessPath(req, env, url, slug) {
   const rest = url.pathname.slice(slug.length + 1) || '/';
   const business = await businessBySlug(env, slug);
+  if (!business) {
+    // Dirección anterior (el consultorio cambió de enlace): redirige a la actual conservando el resto.
+    const alias = await env.DB.prepare(
+      'SELECT b.slug FROM business_slug_aliases a JOIN businesses b ON b.id = a.business_id WHERE a.slug = ?',
+    ).bind(slug).first();
+    if (alias) return Response.redirect(`${url.origin}/${alias.slug}${rest === '/' ? '' : rest}${url.search}`, 301);
+  }
   if (!business || business.status !== 'active') throw notFound('No encontramos este consultorio.');
 
   if (rest === '/') return cardPage(env, url, businessCardInfo(business));

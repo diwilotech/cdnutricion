@@ -4,7 +4,6 @@ import { tenantDb, globalDb, uuid } from '../lib/db.js';
 import { sendWhatsApp } from '../integrations/whatsapp.js';
 import { sendMail } from '../integrations/email.js';
 import { createInvite, invitePath } from '../lib/auth.js';
-import { validateSlug } from '../lib/tenant.js';
 
 const ROLES = ['owner', 'admin', 'staff'];
 
@@ -36,26 +35,18 @@ export function routes(r) {
   r.put('/api/admin/business', 'manager', async (c) => {
     const body = await readJson(c.req);
     const db = tenantDb(c);
-    // La dirección pública (/<slug>) solo la cambia un propietario y debe ser única.
-    let slug = null;
-    if (body.slug !== undefined && body.slug !== c.session.business_slug) {
-      if (c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede cambiar la dirección del consultorio');
-      slug = validateSlug(body.slug);
-      const taken = await globalDb(c.env).first('SELECT 1 FROM businesses WHERE slug = ? AND id <> ?', slug, c.businessId);
-      if (taken) throw new HttpError(409, 'Esa dirección ya la usa otro consultorio');
-    }
+    // La dirección pública (/<slug>) se maneja desde Diwilo Web (api/platform.js).
     await db.run(
-      `UPDATE businesses SET name = ?, email = ?, phone = ?, timezone = ?, wa_instance = ?, slug = COALESCE(?, slug), updated_at = datetime('now')
+      `UPDATE businesses SET name = ?, email = ?, phone = ?, timezone = ?, wa_instance = ?, updated_at = datetime('now')
         WHERE id = ? /* business_id */`,
       str(body.name, { required: true, max: 120, label: 'Nombre' }),
       email(body.email, { label: 'Correo' }),
       str(body.phone, { max: 30, label: 'Teléfono' }),
       validTimezone(str(body.timezone, { max: 60 }) || 'America/Bogota'),
       str(body.wa_instance, { max: 80, label: 'Instancia WhatsApp' }),
-      slug,
       c.businessId,
     );
-    return json({ ok: true, slug: slug || c.session.business_slug });
+    return json({ ok: true });
   });
 
   // ---------- equipo ----------

@@ -40,8 +40,17 @@ Cada consultorio vive en su propia ruta, igual que Control de Citas ([src/lib/te
 | `/<slug>/p/#<token>` | seguimiento del paciente |
 | `/admin/…` | redirige al consultorio de origen (Referer) o al de la sesión |
 
-El propietario cambia la dirección en **Ajustes** (única, sin palabras reservadas como `admin` o `api`);
-Diwilo Web también puede fijarla con `PATCH /api/platform/businesses/:id { slug }`.
+La dirección, la tarjeta y el logo **del consultorio** se administran desde **Diwilo Web** (para todos los negocios):
+
+| Diwilo Web llama | Para |
+|---|---|
+| `PATCH /api/platform/businesses/:id { slug }` | cambiar la dirección; la anterior queda como alias y redirige (301) |
+| `PATCH /api/platform/businesses/:id { card }` | tarjeta del consultorio: `specialty, bio, address, lat, lng, showMap, hours, links[]` |
+| `POST /api/platform/businesses/:id/logo` (multipart `file`) · `DELETE …/logo` | logo del consultorio |
+| `GET /api/platform/businesses[/:id]` | incluye `public_url`, `admin_url`, `logo_url` y `card` |
+
+En el panel, **Ajustes → Mi tarjeta** es la tarjeta de cada profesional (`/<slug>/<handle>`): foto, nombre, especialidad,
+bio, WhatsApp, correo, horario, dirección/mapa y enlaces; lo que deje vacío se toma de la tarjeta del consultorio.
 
 ### Cuerpo Vivo
 

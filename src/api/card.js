@@ -32,7 +32,7 @@ function linksField(raw) {
   });
 }
 
-function cardFields(body) {
+export function cardFields(body) {
   const lat = coord(body.lat, 90, 'Latitud'), lng = coord(body.lng, 180, 'Longitud');
   return {
     specialty: str(body.specialty, { max: 80, label: 'Especialidad' }),
@@ -57,6 +57,7 @@ const slugify = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]
 export const memberPhotoUrl = (slug, handle, key) => (key ? `/api/public/negocio/${slug}/${handle}/foto?v=${key.slice(-12)}` : null);
 
 function memberFields(body) {
+  const lat = coord(body.lat, 90, 'Latitud'), lng = coord(body.lng, 180, 'Longitud');
   const phone = str(body.phone, { max: 30, label: 'WhatsApp' });
   const mail = str(body.email, { max: 254, label: 'Correo' });
   if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) throw new HttpError(400, 'El correo no es válido');
@@ -65,6 +66,12 @@ function memberFields(body) {
     specialty: str(body.specialty, { max: 80, label: 'Especialidad' }),
     bio: str(body.bio, { max: 500, label: 'Descripción' }),
     phone, email: mail ? mail.toLowerCase() : null,
+    // Opcionales: si quedan vacíos se usan los del consultorio.
+    address: str(body.address, { max: 200, label: 'Dirección' }),
+    lat: lat !== null && lng !== null ? lat : null,
+    lng: lat !== null && lng !== null ? lng : null,
+    showMap: !!body.showMap,
+    hours: str(body.hours, { max: 120, label: 'Horario' }),
     links: linksField(body.links),
   };
 }
@@ -100,38 +107,7 @@ export function routes(r) {
     return json({ name: b.name, slug: b.slug, phone: b.phone, email: b.email, logo: logoUrl(b.slug, b.logo_key), card: parseCard(b.card) });
   });
 
-  r.put('/api/admin/card', 'manager', async (c) => {
-    const card = cardFields((await readJson(c.req)).card || {});
-    await tenantDb(c).run(
-      `UPDATE businesses SET card = ?, updated_at = datetime('now') WHERE id = ? /* business_id */`,
-      JSON.stringify(card), c.businessId,
-    );
-    return json({ ok: true, card });
-  });
-
-  // Foto de perfil: llega ya recortada en cuadrado desde el navegador.
-  r.post('/api/admin/card/logo', 'manager', async (c) => {
-    const form = await c.req.formData().catch(() => null);
-    const file = form?.get('file');
-    if (!file || typeof file === 'string') throw new HttpError(400, 'Adjunta una imagen');
-    if (!LOGO_TYPES.test(file.type)) throw new HttpError(415, 'La foto debe ser PNG, JPG o WebP');
-    if (file.size > MAX_LOGO) throw new HttpError(413, 'La foto supera 3 MB');
-    const db = tenantDb(c);
-    const prev = await db.first('SELECT slug, logo_key FROM businesses WHERE id = ? /* business_id */', c.businessId);
-    const key = `${c.businessId}/brand/${uuid()}`;
-    await c.env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
-    await db.run(`UPDATE businesses SET logo_key = ?, updated_at = datetime('now') WHERE id = ? /* business_id */`, key, c.businessId);
-    if (prev.logo_key) c.ctx.waitUntil(c.env.FILES.delete(prev.logo_key));
-    return json({ ok: true, logo: logoUrl(prev.slug, key) }, 201);
-  });
-
-  r.delete('/api/admin/card/logo', 'manager', async (c) => {
-    const db = tenantDb(c);
-    const prev = await db.first('SELECT logo_key FROM businesses WHERE id = ? /* business_id */', c.businessId);
-    await db.run(`UPDATE businesses SET logo_key = NULL WHERE id = ? /* business_id */`, c.businessId);
-    if (prev.logo_key) c.ctx.waitUntil(c.env.FILES.delete(prev.logo_key));
-    return json({ ok: true });
-  });
+  // La tarjeta y el logo del consultorio se editan desde Diwilo Web (api/platform.js).
 
   // ---------- mi tarjeta (cada profesional, cualquier rol) ----------
 
@@ -241,8 +217,11 @@ export async function memberCardData(env, slug, handle) {
     email: mine.email || null,
     card: {
       specialty: mine.specialty, bio: mine.bio,
-      // Del consultorio: dónde atiende y en qué horario.
-      address: biz.address, lat: biz.lat, lng: biz.lng, showMap: biz.showMap, hours: biz.hours,
+      // Dónde atiende y en qué horario: lo suyo, o lo del consultorio si no lo puso.
+      ...(mine.address || mine.lat != null
+        ? { address: mine.address, lat: mine.lat, lng: mine.lng, showMap: mine.showMap }
+        : { address: biz.address, lat: biz.lat, lng: biz.lng, showMap: biz.showMap }),
+      hours: mine.hours || biz.hours,
       links: mine.links?.length ? mine.links : biz.links || [],
     },
   };
