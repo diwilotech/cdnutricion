@@ -10,6 +10,8 @@
 //   POST   /api/platform/businesses/:id/logo        multipart 'file' (PNG/JPG/WebP, cuadrada, ≤3 MB)
 //   DELETE /api/platform/businesses/:id/logo
 //   POST   /api/platform/businesses/:id/users       { email, name?, role: owner|admin|staff } -> invite_path
+//          Un solo propietario por negocio: role 'owner' le pasa la propiedad (el anterior queda como administrador).
+//   DELETE /api/platform/businesses/:id/users/:userId   (el propietario no se quita: primero se pasa la propiedad)
 //   DELETE /api/platform/businesses/:id/users/:userId
 import { json, readJson, HttpError, str, oneOf, email } from '../lib/http.js';
 import { globalDb, uuid } from '../lib/db.js';
@@ -67,11 +69,19 @@ async function addMember(env, businessId, mail, name, role) {
     user = { id: uuid() };
     await db.run('INSERT INTO users (id, email, name) VALUES (?, ?, ?)', user.id, mail, name);
   }
-  await db.run(
-    `INSERT INTO memberships (user_id, business_id, role) VALUES (?, ?, ?)
-     ON CONFLICT (user_id, business_id) DO UPDATE SET role = excluded.role`,
-    user.id, businessId, role,
-  );
+  const prev = await db.first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', businessId, user.id);
+  if (prev?.role === 'owner' && role !== 'owner') throw new HttpError(409, 'Es el propietario: para cambiarlo, asigna otro propietario');
+  await db.batch([
+    // Un solo propietario: el anterior pasa a administrador.
+    ...(role === 'owner'
+      ? [db.prepare(`UPDATE memberships SET role = 'admin' WHERE business_id = ? AND role = 'owner' AND user_id <> ?`, businessId, user.id)]
+      : []),
+    db.prepare(
+      `INSERT INTO memberships (user_id, business_id, role) VALUES (?, ?, ?)
+       ON CONFLICT (user_id, business_id) DO UPDATE SET role = excluded.role`,
+      user.id, businessId, role,
+    ),
+  ]);
   return { id: user.id, invite_path: invitePath(await createInvite(env, user.id)) };
 }
 
@@ -177,6 +187,8 @@ export function routes(r) {
 
   r.delete('/api/platform/businesses/:id/users/:userId', 'platform', async (c) => {
     const db = globalDb(c.env);
+    const m = await db.first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.params.id, c.params.userId);
+    if (m?.role === 'owner') throw new HttpError(409, 'No se puede quitar al propietario: primero asigna otro propietario');
     await db.batch([
       db.prepare('DELETE FROM memberships WHERE business_id = ? AND user_id = ?', c.params.id, c.params.userId),
       db.prepare('DELETE FROM sessions WHERE business_id = ? AND user_id = ?', c.params.id, c.params.userId),

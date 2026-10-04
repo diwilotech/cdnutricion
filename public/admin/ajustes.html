@@ -87,9 +87,9 @@
             <div class="col-sm-5"><input name="email" type="email" class="form-control" placeholder="correo@ejemplo.com" required></div>
             <div class="col-sm-4"><input name="name" class="form-control" placeholder="Nombre" maxlength="100"></div>
             <div class="col-sm-3"><select name="role" class="form-select">
-              <option value="staff">Equipo</option><option value="admin">Administrador</option><option value="owner">Propietario</option></select></div>
+              <option value="staff">Equipo</option><option value="admin">Administrador</option></select></div>
           </div>
-          <div class="form-text mb-2">Si la persona aún no tiene cuenta, se genera un link para que cree su contraseña.</div>
+          <div class="form-text mb-2">Si la persona aún no tiene cuenta, se genera un link para que cree su contraseña. El propietario es único y se asigna desde Diwilo.</div>
           <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Agregar</button>
         </form>
       </div>
@@ -209,7 +209,7 @@
                 </div>
                 <div class="d-flex flex-column gap-1 align-items-center">
                   ${editable ? `<button class="btn btn-primary team-edit" data-edit="${esc(u.id)}" title="Editar tarjeta"><i class="bi bi-pencil-square"></i></button>` : ''}
-                  ${canManage && !mine ? `<div class="dropdown">
+                  ${canManage && !mine && u.role !== 'owner' ? `<div class="dropdown">
                       <button class="btn btn-sm btn-link text-body-secondary p-0" data-bs-toggle="dropdown" aria-label="Opciones"><i class="bi bi-three-dots"></i></button>
                       <ul class="dropdown-menu dropdown-menu-end">
                         <li><button class="dropdown-item" data-reset="${esc(u.id)}"><i class="bi bi-link-45deg me-2"></i>Link para crear contraseña</button></li>

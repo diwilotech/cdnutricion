@@ -71,7 +71,7 @@ El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`
 
 | Nivel | Quién | Puede |
 |---|---|---|
-| `owner` | propietario del negocio | todo en su negocio, gestionar propietarios |
+| `owner` | propietario del negocio (**uno solo**, lo asigna Diwilo Web al crear el negocio) | todo en su negocio; no se puede quitar ni cambiar de rol desde el panel |
 | `admin` | administrador | ajustes, equipo, borrar pacientes |
 | `staff` | equipo | pacientes, consultas, citas, archivos |
 

@@ -6,7 +6,8 @@ import { sendMail } from '../integrations/email.js';
 import { createInvite, invitePath } from '../lib/auth.js';
 import { parseCard, memberPhotoUrl } from './card.js';
 
-const ROLES = ['owner', 'admin', 'staff'];
+// El propietario es único y lo asigna Diwilo Web al crear el negocio: desde el panel solo se agregan administradores y equipo.
+const ROLES = ['admin', 'staff'];
 
 export function validTimezone(tz) {
   try {
@@ -70,8 +71,8 @@ export function routes(r) {
   r.post('/api/admin/team', 'manager', async (c) => {
     const body = await readJson(c.req);
     const mail = email(body.email, { required: true, label: 'Correo' });
+    if (body.role === 'owner') throw new HttpError(403, 'El negocio tiene un solo propietario y se asigna desde Diwilo');
     const role = oneOf(body.role, ROLES, { label: 'Rol', fallback: 'staff' });
-    if (role === 'owner' && c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede asignar propietarios');
     const name = str(body.name, { max: 100, label: 'Nombre' });
     const gdb = globalDb(c.env);
     let user = await gdb.first('SELECT id, pin_hash FROM users WHERE email = ?', mail);
@@ -79,6 +80,8 @@ export function routes(r) {
       user = { id: uuid() };
       await gdb.run('INSERT INTO users (id, email, name) VALUES (?, ?, ?)', user.id, mail, name);
     }
+    const current = await tenantDb(c).first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, user.id);
+    if (current?.role === 'owner') throw new HttpError(403, 'El propietario no cambia de rol desde el panel');
     await tenantDb(c).run(
       `INSERT INTO memberships (user_id, business_id, role) VALUES (?, ?, ?)
        ON CONFLICT (user_id, business_id) DO UPDATE SET role = excluded.role`,
@@ -94,7 +97,7 @@ export function routes(r) {
     if (c.params.userId === c.user.id) throw new HttpError(400, 'No puedes quitarte a ti mismo');
     const target = await db.first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId);
     if (!target) throw new HttpError(404, 'Miembro no encontrado');
-    if (target.role === 'owner' && c.role !== 'owner') throw new HttpError(403, 'Solo un propietario puede quitar propietarios');
+    if (target.role === 'owner') throw new HttpError(403, 'El propietario no se puede quitar del negocio');
     await db.batch([
       db.prepare('DELETE FROM memberships WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId),
       db.prepare('DELETE FROM sessions WHERE business_id = ? AND user_id = ?', c.businessId, c.params.userId),
