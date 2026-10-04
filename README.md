@@ -67,10 +67,11 @@ El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`
 
 `/p/`, `/cv/` y `/api/p/` son públicos (el token protege los datos).
 
-**Imprimir plan** guarda una copia fija del plan vigente en `patient_plans` (con las recomendaciones y el peso del momento;
-si nada cambió desde la última, la reusa) y abre `/admin/plan?v=<id>`: hoja carta para imprimir o guardar en PDF, con las
-comidas, metas, recomendaciones, lo que debe evitar y un QR pequeño al seguimiento del paciente; al reverso, la lista de
-intercambios. En la Ficha, **Planes entregados** lista el historial para reimprimir o volver a un plan anterior.
+**Informe de la consulta (PDF):** cada cita atendida tiene un botón PDF (en la Ficha y en la Agenda); **Imprimir plan**
+hace lo mismo con la cita de hoy. Guarda en `patient_plans` el plan entregado ligado a su cita (de hoy: se actualiza al
+reimprimir; pasada: queda fija) y abre `/admin/plan?v=<id>`, hoja carta con: cómo va (medidas de esa consulta frente a la
+anterior y a la primera), últimos exámenes hasta ese día, comidas, metas, recomendaciones, lo que debe evitar y un QR
+pequeño a su seguimiento; al reverso, la lista de intercambios.
 
 ### Roles
 

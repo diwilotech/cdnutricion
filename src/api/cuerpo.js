@@ -210,94 +210,136 @@ export function routes(r) {
     return json({ ok: true });
   });
 
-  // ---------- planes entregados (historial que se imprime) ----------
+  // ---------- informe de la cita: el plan entregado y cómo va el paciente ese día ----------
 
-  r.get('/api/admin/patients/:id/plans', 'tenant', async (c) => {
-    const rows = await tenantDb(c).all(
-      `SELECT p.id, p.created_at, p.weight_kg, p.plan, COALESCE(u.name, u.email) AS author
-         FROM patient_plans p LEFT JOIN users u ON u.id = p.created_by
-        WHERE p.business_id = ? AND p.patient_id = ? ORDER BY p.created_at DESC LIMIT 100`,
-      c.businessId, c.params.id,
-    );
-    return json({
-      plans: rows.map(({ plan, ...x }) => {
-        const doc = parse(plan) || {};
-        return { ...x, meals: (doc.meals || []).length, agua: doc.agua || null };
-      }),
-    });
-  });
-
-  // Entregar el plan vigente: se guarda una copia fija. Si no cambió desde la última, se reusa esa.
+  // Entregar el plan. Queda ligado a la cita indicada, o a la de hoy si la hay.
+  //  - Cita de hoy o futura: se actualiza con el plan vigente (reimprimir tras editar trae lo último).
+  //  - Cita pasada: queda fija; si nunca se imprimió, toma el último plan entregado hasta ese día.
+  //  - Sin cita: si nada cambió desde la última entrega, se reusa esa.
   r.post('/api/admin/patients/:id/plans', 'tenant', async (c) => {
     const db = tenantDb(c);
-    await getPatient(db, c.businessId, c.params.id);
+    const bid = c.businessId, pid = c.params.id;
+    await getPatient(db, bid, pid);
     const body = await readJson(c.req);
     const plan = jsonDoc(body.plan, 'plan');
     if (!plan) throw new HttpError(400, 'Falta el plan');
-    const [last, recs, weight] = await db.batch([
+    const today = localNow(c.timezone).date;
+    const appt = body.appointment_id
+      ? await db.first('SELECT id, starts_at FROM appointments WHERE business_id = ? AND patient_id = ? AND id = ?', bid, pid, str(body.appointment_id, { max: 64 }))
+      : await db.first(
+        `SELECT id, starts_at FROM appointments WHERE business_id = ? AND patient_id = ? AND substr(starts_at, 1, 10) = ?
+            AND status IN ('scheduled', 'done') ORDER BY starts_at LIMIT 1`,
+        bid, pid, today,
+      );
+    if (body.appointment_id && !appt) throw new HttpError(404, 'Cita no encontrada');
+    const day = appt ? appt.starts_at.slice(0, 10) : today;
+    const past = day < today;
+
+    const [existing, recs, weight, before] = await db.batch([
+      db.prepare('SELECT id FROM patient_plans WHERE business_id = ? AND appointment_id = ?', bid, appt?.id ?? ''),
       db.prepare(
-        'SELECT id, plan, recs FROM patient_plans WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 1',
-        c.businessId, c.params.id,
+        `SELECT text FROM recommendations WHERE business_id = ? AND patient_id = ? AND substr(created_at, 1, 10) <= ?
+          ORDER BY created_at DESC LIMIT 8`,
+        bid, pid, day,
       ),
       db.prepare(
-        'SELECT text FROM recommendations WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 8',
-        c.businessId, c.params.id,
-      ),
-      db.prepare(
-        `SELECT weight_kg FROM consultations WHERE business_id = ? AND patient_id = ? AND weight_kg IS NOT NULL
+        `SELECT weight_kg FROM consultations WHERE business_id = ? AND patient_id = ? AND weight_kg IS NOT NULL AND date <= ?
           ORDER BY date DESC, created_at DESC LIMIT 1`,
-        c.businessId, c.params.id,
+        bid, pid, day,
+      ),
+      db.prepare(
+        `SELECT id, plan, recs, appointment_id FROM patient_plans WHERE business_id = ? AND patient_id = ? AND substr(created_at, 1, 10) <= ?
+          ORDER BY created_at DESC LIMIT 1`,
+        bid, pid, past ? day : '9999-12-31',
       ),
     ]);
     const recsDoc = JSON.stringify(recs.results.map((x) => x.text));
-    const prev = last.results[0];
-    if (prev && prev.plan === plan && prev.recs === recsDoc) return json({ id: prev.id, reused: true });
+    const kg = weight.results[0]?.weight_kg ?? null;
+    const prev = before.results[0];
+    const found = existing.results[0];
+    if (found) {
+      if (!past) {
+        await db.run(
+          'UPDATE patient_plans SET plan = ?, recs = ?, weight_kg = ?, created_by = ? WHERE business_id = ? AND id = ?',
+          plan, recsDoc, kg, c.user.id, bid, found.id,
+        );
+      }
+      return json({ id: found.id });
+    }
+    if (!appt && prev && !prev.appointment_id && prev.plan === plan && prev.recs === recsDoc) return json({ id: prev.id, reused: true });
     const id = uuid();
     await db.run(
-      'INSERT INTO patient_plans (id, business_id, patient_id, plan, recs, weight_kg, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      id, c.businessId, c.params.id, plan, recsDoc, weight.results[0]?.weight_kg ?? null, c.user.id,
+      `INSERT INTO patient_plans (id, business_id, patient_id, appointment_id, plan, recs, weight_kg, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, bid, pid, appt?.id ?? null, past && prev ? prev.plan : plan, recsDoc, kg, c.user.id,
     );
     return json({ id }, 201);
   });
 
-  // Todo lo que lleva la hoja impresa: el plan entregado, el consultorio, quién lo entrega y el QR del paciente.
+  // Todo lo que lleva la hoja: plan entregado, cómo va (medidas y exámenes hasta ese día), consultorio, quién lo entrega y QR.
   r.get('/api/admin/plans/:planId', 'tenant', async (c) => {
     const db = tenantDb(c);
+    const bid = c.businessId;
     const row = await db.first(
       `SELECT p.id, p.patient_id, p.plan, p.recs, p.weight_kg, p.created_at, p.created_by,
+              a.starts_at AS appt_at, a.kind AS appt_kind, a.status AS appt_status,
               u.name AS user_name, m.card AS member_card, m.handle, m.photo_key
          FROM patient_plans p
+         LEFT JOIN appointments a ON a.id = p.appointment_id AND a.business_id = p.business_id
          LEFT JOIN users u ON u.id = p.created_by
          LEFT JOIN memberships m ON m.user_id = p.created_by AND m.business_id = p.business_id
         WHERE p.business_id = ? AND p.id = ?`,
-      c.businessId, c.params.planId,
+      bid, c.params.planId,
     );
     if (!row) throw new HttpError(404, 'Plan no encontrado');
-    const today = localNow(c.timezone).date;
-    const [patient, business, next, latest] = await db.batch([
-      db.prepare('SELECT id, first_name, last_name, birth_date, goal FROM patients WHERE business_id = ? AND id = ?', c.businessId, row.patient_id),
-      db.prepare('SELECT name, slug, phone, email, logo_key, card FROM businesses WHERE id = ? /* business_id */', c.businessId),
+    const day = row.appt_at ? row.appt_at.slice(0, 10) : row.created_at.slice(0, 10);
+    const pid = row.patient_id;
+    const [patient, business, next, latest, cons, labs] = await db.batch([
+      db.prepare('SELECT id, first_name, last_name, birth_date, sex, height_cm, goal FROM patients WHERE business_id = ? AND id = ?', bid, pid),
+      db.prepare('SELECT name, slug, phone, email, logo_key, card FROM businesses WHERE id = ? /* business_id */', bid),
       db.prepare(
         `SELECT starts_at FROM appointments WHERE business_id = ? AND patient_id = ?
-            AND status = 'scheduled' AND starts_at >= ? ORDER BY starts_at LIMIT 1`,
-        c.businessId, row.patient_id, today,
+            AND status = 'scheduled' AND substr(starts_at, 1, 10) > ? ORDER BY starts_at LIMIT 1`,
+        bid, pid, day,
+      ),
+      db.prepare('SELECT id FROM patient_plans WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 1', bid, pid),
+      db.prepare(
+        `SELECT date, weight_kg, fat_pct, muscle_pct, measures FROM consultations
+          WHERE business_id = ? AND patient_id = ? AND date <= ? ORDER BY date ASC, created_at ASC`,
+        bid, pid, day,
       ),
       db.prepare(
-        'SELECT id FROM patient_plans WHERE business_id = ? AND patient_id = ? ORDER BY created_at DESC LIMIT 1',
-        c.businessId, row.patient_id,
+        'SELECT date, vals FROM patient_labs WHERE business_id = ? AND patient_id = ? AND date <= ? ORDER BY date DESC LIMIT 2',
+        bid, pid, day,
       ),
     ]);
     const b = business.results[0];
     const bc = parseCard(b.card), mc = parseCard(row.member_card);
-    const portal = await activePortal(c, row.patient_id);
+    const portal = await activePortal(c, pid);
+    // Evolución hasta ese día: primera, anterior y la del día (o la última antes).
+    const hist = cons.results.map((x) => {
+      const m = parse(x.measures) || {};
+      return { date: x.date, weight_kg: x.weight_kg, fat_pct: x.fat_pct, muscle_pct: x.muscle_pct, cintura: m.cintura ?? null, cadera: m.cadera ?? null };
+    });
+    const labRows = labs.results.map((x) => ({ date: x.date, vals: parse(x.vals) || {} }));
     return json({
       id: row.id,
       created_at: row.created_at,
+      day,
       latest: latest.results[0]?.id === row.id,
+      appointment: row.appt_at ? { starts_at: row.appt_at, kind: row.appt_kind, status: row.appt_status } : null,
       plan: parse(row.plan),
       recs: parse(row.recs) || [],
       weight_kg: row.weight_kg,
       patient: patient.results[0] || null,
+      progress: {
+        count: hist.length,
+        first: hist.length > 2 ? hist[0] : null,
+        previous: hist.length > 1 ? hist.at(-2) : null,
+        current: hist.at(-1) || null,
+      },
+      labs: labRows[0] || null,
+      labsPrev: labRows[1] || null,
       nextAppointment: next.results[0]?.starts_at || null,
       business: { name: b.name, phone: bc.phone || b.phone, email: b.email, address: bc.address || null, logo: logoUrl(b.slug, b.logo_key) },
       professional: row.created_by ? {
@@ -311,10 +353,13 @@ export function routes(r) {
     });
   });
 
-  r.delete('/api/admin/plans/:planId', 'tenant', async (c) => {
-    const res = await tenantDb(c).run('DELETE FROM patient_plans WHERE business_id = ? AND id = ?', c.businessId, c.params.planId);
-    if (!res.meta.changes) throw new HttpError(404, 'Plan no encontrado');
-    return json({ ok: true });
+  // Informes ya generados por cita (para marcar en la ficha cuáles tienen PDF).
+  r.get('/api/admin/patients/:id/plans', 'tenant', async (c) => {
+    const rows = await tenantDb(c).all(
+      'SELECT id, appointment_id FROM patient_plans WHERE business_id = ? AND patient_id = ? AND appointment_id IS NOT NULL',
+      c.businessId, c.params.id,
+    );
+    return json({ plans: rows });
   });
 
   // ---------- paciente (enlace privado) ----------

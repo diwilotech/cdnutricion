@@ -89,6 +89,7 @@
                         <button class="btn btn-outline-success" data-status="done" data-id="${esc(a.id)}" title="Marcar atendida"><i class="bi bi-check2"></i></button>
                         <button class="btn btn-outline-danger" data-status="no_show" data-id="${esc(a.id)}" title="No asistió"><i class="bi bi-person-x"></i></button>
                         <button class="btn btn-outline-secondary" data-remind="${esc(a.id)}" title="Recordatorio WhatsApp${a.reminded_at ? ' (ya enviado)' : ''}"><i class="bi bi-whatsapp"></i></button>` : ''}
+                      ${a.status === 'done' ? `<a class="btn btn-outline-primary" href="${App.base}/cuerpo?id=${esc(a.patient_id)}&informe=${esc(a.id)}" title="Informe de la consulta en PDF"><i class="bi bi-file-earmark-pdf"></i></a>` : ''}
                       <button class="btn btn-outline-secondary" data-edit="${esc(a.id)}" title="Editar"><i class="bi bi-pencil"></i></button>
                     </div>
                   </div>`).join('')

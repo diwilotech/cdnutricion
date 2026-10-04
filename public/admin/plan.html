@@ -43,6 +43,19 @@
     .goal { display: flex; justify-content: space-between; gap: 8px; }
     .goal + .goal { margin-top: 4px; }
     .goal span { color: var(--soft); text-align: right; }
+    .prog { display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; margin: 8px 0 2px; }
+    .prog.solo { grid-template-columns: 1fr; }
+    .ptab { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    .ptab th, .ptab td { padding: 2px 4px; text-align: right; white-space: nowrap; }
+    .ptab th:first-child, .ptab td:first-child { text-align: left; padding-left: 0; }
+    .ptab thead th { font-weight: 600; color: var(--soft); font-size: 8.5pt; border-bottom: 1px solid var(--line); vertical-align: bottom; }
+    .ptab tbody tr + tr td { border-top: 1px dotted var(--line); }
+    .ptab .now { font-weight: 800; }
+    .labs { font-size: 9pt; }
+    .labs div { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; }
+    .labs div + div { border-top: 1px dotted var(--line); }
+    .labs span { color: var(--soft); }
+    .labs .out b::after { content: ' !'; }
     .avoid { margin-top: 10px; padding: 6px 10px; border-left: 3px solid var(--ink); background: var(--tint); }
     .sh-foot { margin-top: auto; padding-top: 10px; display: flex; gap: 12px; align-items: center; border-top: 1px solid var(--line); font-size: 9pt; color: var(--soft); }
     .sh-foot .qr { width: 22mm; height: 22mm; flex: none; }
@@ -63,7 +76,7 @@
     .hide { display: none !important; }
     @media (max-width: 640px) {
       .sheet { padding: 16px; min-height: 0; font-size: 9.5pt; }
-      .two { grid-template-columns: 1fr; }
+      .two, .prog { grid-template-columns: 1fr; }
       .xgrid { columns: 1; }
       .meals th { width: 24mm; }
       .comp { grid-template-columns: 1fr; gap: 0; }
@@ -75,6 +88,8 @@
       .sheet { box-shadow: none; border-radius: 0; margin: 0; padding: 0; max-width: none; min-height: 255mm; break-after: page; font-size: 10pt; }
       .sheet:last-child { break-after: auto; }
       .two { grid-template-columns: 1fr 1.35fr; }
+      .prog { grid-template-columns: 1.5fr 1fr; }
+      .prog.solo { grid-template-columns: 1fr; }
       .xgrid { columns: 3; }
       .comp { grid-template-columns: 25mm 1fr; gap: 6px; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -96,7 +111,8 @@
       <div class="d-flex flex-wrap gap-3 small">
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optQr" checked><label class="form-check-label" for="optQr">QR del seguimiento</label></div>
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optRecs" checked><label class="form-check-label" for="optRecs">Recomendaciones</label></div>
-        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optWeight"><label class="form-check-label" for="optWeight">Peso</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optProg" checked><label class="form-check-label" for="optProg">Cómo vas (medidas)</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optLabs" checked><label class="form-check-label" for="optLabs">Exámenes</label></div>
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optBack" checked><label class="form-check-label" for="optBack">Lista de intercambios (reverso)</label></div>
         <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="optSign"><label class="form-check-label" for="optSign">Firma</label></div>
       </div>
@@ -123,14 +139,14 @@
       const P = d.patient || { first_name: 'Paciente' };
       const plan = d.plan || {};
       const patientUrl = `${App.base}/cuerpo?id=${encodeURIComponent(d.patient?.id || '')}&tab=plan`;
-      document.title = `Plan de ${App.fullName(P)} · ${App.fmtDate(d.created_at)}`;
+      document.title = `Plan de ${App.fullName(P)} · ${App.fmtDate(d.day)}`;
       $('back').href = patientUrl;
       $('tools').hidden = false;
 
       // Plan anterior: se puede volver a él (pasa a ser el plan vigente del paciente).
       if (!d.latest) {
         $('oldBanner').classList.replace('d-none', 'd-flex');
-        $('oldDate').textContent = App.fmtDate(d.created_at);
+        $('oldDate').textContent = App.fmtDate(d.day);
         $('restore').onclick = async () => {
           if (!(await App.confirmAction(`El plan actual de ${P.first_name} se reemplaza por este. ¿Continuar?`))) return;
           try {
@@ -153,6 +169,53 @@
       const avoid = all('evitar'), limit = all('salud');
       const agua = plan.agua || 2;
 
+      // ---------- cómo va: medidas comparadas y exámenes hasta el día de la consulta ----------
+      const LABS = [
+        ['col', 'Colesterol total', 'mg/dL', (v) => v < 200], ['ldl', 'Colesterol LDL', 'mg/dL', (v) => v < 100],
+        ['hdl', 'Colesterol HDL', 'mg/dL', (v) => v >= (P.sex === 'M' ? 40 : 50)], ['tg', 'Triglicéridos', 'mg/dL', (v) => v < 150],
+        ['glu', 'Glucosa en ayunas', 'mg/dL', (v) => v < 100], ['hba1c', 'Hemoglobina glicosilada', '%', (v) => v < 5.7],
+        ['creat', 'Creatinina', 'mg/dL', (v) => v <= (P.sex === 'M' ? 1.3 : 1.1)], ['tfg', 'Filtración glomerular', 'mL/min', (v) => v >= 90],
+        ['bun', 'Nitrógeno ureico', 'mg/dL', (v) => v <= 20], ['urico', 'Ácido úrico', 'mg/dL', (v) => v <= (P.sex === 'M' ? 7 : 6)],
+        ['k', 'Potasio', 'mEq/L', (v) => v >= 3.5 && v <= 5], ['hb', 'Hemoglobina', 'g/dL', (v) => v >= (P.sex === 'M' ? 13.5 : 12)],
+        ['vitd', 'Vitamina D', 'ng/mL', (v) => v >= 30], ['tsh', 'TSH (tiroides)', 'mUI/L', (v) => v >= 0.4 && v <= 4],
+      ];
+      const imc = (x) => (x?.weight_kg && P.height_cm ? x.weight_kg / (P.height_cm / 100) ** 2 : null);
+      const ROWS = [['Peso', (x) => x?.weight_kg, 'kg'], ['IMC', imc, ''], ['Grasa', (x) => x?.fat_pct, '%'],
+        ['Músculo', (x) => x?.muscle_pct, '%'], ['Cintura', (x) => x?.cintura, 'cm'], ['Cadera', (x) => x?.cadera, 'cm']];
+      const n1 = (v) => (v == null ? '—' : App.fmtNum(v, 1));
+      const delta = (a, b) => {
+        if (a == null || b == null) return '—';
+        const dv = Math.round((a - b) * 10) / 10;
+        return dv === 0 ? '=' : `${dv > 0 ? '▲ +' : '▼ −'}${App.fmtNum(Math.abs(dv), 1)}`;
+      };
+      function progress() {
+        const { first, previous, current } = d.progress || {};
+        const lab = d.labs;
+        let table = '';
+        if (current) {
+          const rows = ROWS.filter(([, f]) => f(current) != null);
+          const cols = [first && ['Inicio', first], previous && ['Anterior', previous]].filter(Boolean);
+          table = `<div data-opt="prog"><h2>Cómo vas</h2><table class="ptab"><thead><tr><th></th>
+            ${cols.map(([t, x]) => `<th>${t}<br>${App.fmtDate(x.date)}</th>`).join('')}
+            <th>${current.date === d.day ? 'Esta consulta' : 'Última'}<br>${App.fmtDate(current.date)}</th>
+            ${previous ? '<th>Cambio</th>' : ''}${first ? '<th>Desde el inicio</th>' : ''}</tr></thead><tbody>
+            ${rows.map(([t, f, u]) => `<tr><td>${t}${u ? ` <span style="color:var(--soft)">${u}</span>` : ''}</td>
+              ${cols.map(([, x]) => `<td>${n1(f(x))}</td>`).join('')}<td class="now">${n1(f(current))}</td>
+              ${previous ? `<td>${delta(f(current), f(previous))}</td>` : ''}${first ? `<td>${delta(f(current), f(first))}</td>` : ''}</tr>`).join('')}
+            </tbody></table></div>`;
+        }
+        let labs = '';
+        if (lab) {
+          const prev = d.labsPrev?.vals || {};
+          const items = LABS.filter(([k]) => lab.vals[k] != null);
+          labs = `<div data-opt="labs"><h2>Exámenes · ${App.fmtDate(lab.date)}</h2><div class="labs">
+            ${items.map(([k, n, u, ok]) => `<div class="${ok(lab.vals[k]) ? '' : 'out'}">${n}<span><b>${App.fmtNum(lab.vals[k], 2)}</b> ${u}${prev[k] != null ? ` · antes ${App.fmtNum(prev[k], 2)}` : ''}</span></div>`).join('')}
+            </div></div>`;
+        }
+        if (!table && !labs) return '';
+        return `<div class="prog ${table && labs ? '' : 'solo'}" data-prog>${table}${labs}</div>`;
+      }
+
       function front() {
         const pro = d.professional;
         const logo = d.business.logo || pro?.photo;
@@ -173,14 +236,17 @@
           </header>
           <div class="sh-meta">
             <span>Paciente: <b>${esc(App.fullName(P))}</b></span>
-            <span>Entregado: <b>${App.fmtDate(d.created_at)}</b></span>
+            ${d.appointment
+              ? `<span>Consulta: <b>${esc(App.fmtDateTime(d.appointment.starts_at))}</b> · ${esc(App.KIND[d.appointment.kind] || '')}</span>`
+              : `<span>Entregado: <b>${App.fmtDate(d.created_at)}</b></span>`}
             ${d.nextAppointment ? `<span>Próxima cita: <b>${esc(App.fmtDateTime(d.nextAppointment))}</b></span>` : ''}
-            <span data-opt="weight">${d.weight_kg ? `Peso: <b>${App.fmtNum(d.weight_kg)} kg</b>` : ''}${P.goal ? ` · Objetivo: <b>${esc(P.goal)}</b>` : ''}</span>
+            ${P.goal ? `<span>Objetivo: <b>${esc(P.goal)}</b></span>` : ''}
           </div>
+          ${progress()}
           <table class="meals"><tbody>${meals}</tbody></table>
-          <div class="two">
+          <div class="two" data-two>
             <div class="box"><h2>Metas</h2>${goals}</div>
-            <div class="box" data-opt="recs"><h2>Recomendaciones</h2>${recs.length ? `<ul>${recs.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '<span class="text-body-secondary">—</span>'}</div>
+            ${recs.length ? `<div class="box" data-opt="recs"><h2>Recomendaciones</h2><ul>${recs.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
           </div>
           ${avoid.length || limit.length ? `<div class="avoid">${avoid.length ? `<b>Evita:</b> ${esc(avoid.join(', '))}.` : ''}${limit.length ? ` <b>Limita por tu salud:</b> ${esc(limit.join(', '))}.` : ''}</div>` : ''}
           <footer class="sh-foot">
@@ -204,7 +270,7 @@
           return rows ? `<div class="xg"><h3>${esc(g.n)}</h3><div class="por">${esc(g.por || '')}</div>${rows}</div>` : '';
         }).join('');
         return `<section class="sheet" data-opt="back">
-          <header class="sh-head"><div class="sh-org"><b>Lista de intercambios</b><span>${esc(App.fullName(P))} · ${App.fmtDate(d.created_at)}</span></div></header>
+          <header class="sh-head"><div class="sh-org"><b>Lista de intercambios</b><span>${esc(App.fullName(P))} · ${App.fmtDate(d.day)}</span></div></header>
           <p class="mt-2 mb-0">Cada alimento equivale a <b>1 porción</b> en la cantidad indicada. Cambia un alimento por otro del mismo grupo.</p>
           <div class="legend"><span class="pref">★ Recomendado</span><span>Permitido</span><span class="lim">~ Con moderación</span><span>! Limitar por tu salud</span></div>
           <div class="xgrid">${groups}</div>
@@ -241,7 +307,7 @@
       paintQr();
 
       // ---------- opciones de impresión (se recuerdan en este navegador) ----------
-      const OPTS = { qr: 'optQr', recs: 'optRecs', weight: 'optWeight', back: 'optBack', sign: 'optSign' };
+      const OPTS = { qr: 'optQr', recs: 'optRecs', prog: 'optProg', labs: 'optLabs', back: 'optBack', sign: 'optSign' };
       try {
         const saved = JSON.parse(localStorage.getItem('cdn.planPrint') || '{}');
         for (const [k, idv] of Object.entries(OPTS)) if (k in saved) $(idv).checked = saved[k];
@@ -250,8 +316,17 @@
         const state = {};
         for (const [k, idv] of Object.entries(OPTS)) {
           state[k] = $(idv).checked;
-          const off = !state[k] || (k === 'qr' && !url) || (k === 'weight' && !d.weight_kg && !P.goal);
+          const off = !state[k] || (k === 'qr' && !url);
           document.querySelectorAll(`[data-opt="${k}"]`).forEach((el) => el.classList.toggle('hide', off));
+        }
+        const two = document.querySelector('[data-two]');
+        two.style.gridTemplateColumns = [...two.children].filter((el) => !el.classList.contains('hide')).length < 2 ? '1fr' : '';
+        // Si se oculta una de las dos columnas de "cómo vas", la otra ocupa todo el ancho.
+        const pg = document.querySelector('[data-prog]');
+        if (pg) {
+          const shown = [...pg.children].filter((el) => !el.classList.contains('hide')).length;
+          pg.classList.toggle('solo', shown < 2);
+          pg.classList.toggle('hide', shown === 0);
         }
         $('qrHelp').hidden = url || !state.qr;
         try { localStorage.setItem('cdn.planPrint', JSON.stringify(state)); } catch { /* sin almacenamiento */ }

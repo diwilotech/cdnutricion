@@ -80,16 +80,20 @@
         { patient_id: id, first_name: P.first_name, last_name: P.last_name });
 
       // ---------- imprimir: el plan vigente queda guardado como "plan entregado" ----------
+      // Informe en PDF: el plan vigente queda guardado con la cita (la indicada, o la de hoy si hay).
+      async function openReport(appointmentId) {
+        const plan = cv.planDoc();
+        await put({ plan });
+        const r = await App.api(`/patients/${id}/plans`, { method: 'POST', body: { plan, appointment_id: appointmentId || undefined } });
+        location.href = `${App.base}/plan?v=${r.id}`;
+      }
       $('#btnPrint').onclick = async () => {
         const b = $('#btnPrint');
         b.disabled = true;
-        try {
-          const plan = cv.planDoc();
-          await put({ plan });
-          const r = await App.api(`/patients/${id}/plans`, { method: 'POST', body: { plan } });
-          location.href = `${App.base}/plan?v=${r.id}`;
-        } catch (err) { b.disabled = false; App.fail(err); }
+        try { await openReport(); } catch (err) { b.disabled = false; App.fail(err); }
       };
+      // Desde la agenda: ?informe=<cita> abre directo el PDF de esa cita.
+      if (params.get('informe')) openReport(params.get('informe')).catch(App.fail);
 
       // ---------- vista del paciente: ver lo que ve y compartirle su enlace ----------
       let portal = data.portal;
@@ -193,7 +197,7 @@
         if (!ficha) panel.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
         try {
           const [f, pl] = await Promise.all([App.api(`/patients/${id}`), App.api(`/patients/${id}/plans`)]);
-          ficha = { ...f, plans: pl.plans };
+          ficha = { ...f, reports: new Set(pl.plans.map((x) => x.appointment_id)) };
         } catch (err) { App.fail(err); return; }
         fichaLoaded = true;
         renderFicha();
@@ -241,6 +245,7 @@
                     <div class="small text-body-secondary">${App.KIND[a.kind]} · ${a.duration_min} min${a.reminded_at ? ' · recordatorio enviado' : ''}${a.notes ? ' · ' + esc(a.notes) : ''}</div>
                   </div>
                   ${App.statusBadge(a.status)}
+                  ${a.status === 'done' ? `<button class="btn btn-sm ${ficha.reports.has(a.id) ? 'btn-primary' : 'btn-outline-primary'}" data-report="${esc(a.id)}" title="Informe de la consulta en PDF: cómo va y el plan entregado"><i class="bi bi-file-earmark-pdf"></i><span class="hide-xs ms-1">PDF</span></button>` : ''}
                   ${a.status === 'scheduled' ? `<button class="btn btn-sm btn-outline-success" data-remind="${esc(a.id)}" title="Recordatorio por WhatsApp"><i class="bi bi-whatsapp"></i></button>` : ''}
                   <button class="btn btn-sm btn-outline-secondary" data-edit-appt="${esc(a.id)}" title="Editar"><i class="bi bi-pencil"></i></button>
                 </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Sin citas</div>'}
@@ -267,24 +272,6 @@
                     </tr>`).join('') : '<tr><td colspan="6" class="text-center text-body-secondary py-4 small">Sin consultas registradas</td></tr>'}
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          <div class="card fp-card">
-            <div class="d-flex justify-content-between align-items-center p-3 pb-2">
-              <h3 class="m-0"><i class="bi bi-journal-text me-2 text-primary"></i>Planes entregados</h3>
-              <button class="btn btn-sm btn-outline-primary" data-act="print"><i class="bi bi-printer me-1"></i>Imprimir plan actual</button>
-            </div>
-            <div class="list-group list-group-flush">
-              ${ficha.plans.length ? ficha.plans.map((x, i) => `
-                <div class="list-group-item d-flex flex-wrap align-items-center gap-2 py-3">
-                  <div class="flex-grow-1">
-                    <div class="fw-semibold">${App.fmtDate(x.created_at)}${i === 0 ? ' <span class="badge text-bg-primary bg-opacity-75">Último</span>' : ''}</div>
-                    <div class="small text-body-secondary">${x.meals} ${x.meals === 1 ? 'tiempo' : 'tiempos'} de comida${x.weight_kg ? ` · peso ${App.fmtNum(x.weight_kg)} kg` : ''}${x.author ? ` · ${esc(x.author)}` : ''}</div>
-                  </div>
-                  <a class="btn btn-sm btn-outline-secondary" href="${App.base}/plan?v=${esc(x.id)}" title="Ver o reimprimir"><i class="bi bi-printer"></i><span class="hide-xs ms-1">Ver</span></a>
-                  <button class="btn btn-sm btn-link text-danger" data-del-plan="${esc(x.id)}" title="Eliminar del historial"><i class="bi bi-trash"></i></button>
-                </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Cada vez que imprimas el plan queda guardado aquí con su fecha.</div>'}
             </div>
           </div>
 
@@ -320,13 +307,9 @@
             location.href = '/admin/pacientes';
           } else if (act === 'new-appt') {
             $('#btnAgendar').click();
-          } else if (act === 'print') {
-            $('#btnPrint').click();
-          } else if (t.dataset.delPlan) {
-            if (!confirm('¿Quitar este plan del historial? El plan actual del paciente no cambia.')) return;
-            await App.api(`/plans/${t.dataset.delPlan}`, { method: 'DELETE' });
-            App.toast('Plan quitado del historial');
-            loadFicha(true);
+          } else if (t.dataset.report) {
+            t.disabled = true;
+            await openReport(t.dataset.report);
           } else if (act === 'measure') {
             cv.setTab('medidas');
           } else if (t.dataset.editAppt) {
