@@ -3,6 +3,9 @@
 
 const App = (() => {
   const API = '/api/admin';
+  // Multi-tenant por ruta: el panel vive en /<slug>/admin y la API recibe el consultorio en x-business.
+  const SLUG = (location.pathname.match(/^\/([a-z0-9-]+)\/admin(?:\/|$)/) || [])[1] || null;
+  const BASE = SLUG ? `/${SLUG}/admin` : '/admin';
   let me = null;
 
   // Tema claro/oscuro según el sistema.
@@ -66,7 +69,7 @@ const App = (() => {
   // ---------- API ----------
 
   async function api(path, { method = 'GET', body, form } = {}) {
-    const headers = { 'x-cdn': '1' };
+    const headers = { 'x-cdn': '1', ...(SLUG ? { 'x-business': SLUG } : {}) };
     let payload;
     if (form) payload = form;
     else if (body !== undefined) {
@@ -76,8 +79,12 @@ const App = (() => {
     const res = await fetch(API + path, { method, headers, body: payload, credentials: 'same-origin' });
     const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
     if (!res.ok) {
-      if (data?.code === 'NO_SESSION' && !location.pathname.startsWith('/admin/login')) {
-        location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search);
+      if (data?.code === 'NO_SESSION' && !location.pathname.startsWith(`${BASE}/login`)) {
+        location.href = `${BASE}/login?next=` + encodeURIComponent(location.pathname + location.search);
+        return new Promise(() => {});
+      }
+      if (data?.code === 'NOT_MEMBER' || (data?.code === 'NO_BUSINESS' && SLUG)) {
+        location.href = '/admin/';  // a su propio consultorio
         return new Promise(() => {});
       }
       const err = new Error(data?.error || `Error ${res.status}`);
@@ -177,7 +184,7 @@ const App = (() => {
         ? `<li><h6 class="dropdown-header">Cambiar de negocio</h6></li>` +
           me.businesses
             .map(
-              (b) => `<li><button class="dropdown-item d-flex justify-content-between gap-3" data-business="${esc(b.id)}">
+              (b) => `<li><button class="dropdown-item d-flex justify-content-between gap-3" data-business="${esc(b.id)}" data-slug="${esc(b.slug)}">
                 <span>${esc(b.name)}</span>${b.id === s.businessId ? '<i class="bi bi-check2"></i>' : ''}</button></li>`,
             )
             .join('') +
@@ -235,14 +242,14 @@ const App = (() => {
       if (b) {
         try {
           await api('/auth/business', { method: 'POST', body: { businessId: b.dataset.business } });
-          location.href = '/admin/';
+          location.href = `/${b.dataset.slug}/admin/`;
         } catch (err) { fail(err); }
         return;
       }
       const a = ev.target.closest('[data-action]');
       if (a?.dataset.action === 'logout') {
         await api('/auth/logout', { method: 'POST' }).catch(() => {});
-        location.href = '/admin/login';
+        location.href = `${BASE}/login`;
       } else if (a?.dataset.action === 'change-password') {
         changePasswordDialog();
       }
@@ -302,7 +309,7 @@ const App = (() => {
     const list = me.businesses
       .filter((b) => b.status === 'active')
       .map(
-        (b) => `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-business="${esc(b.id)}">
+        (b) => `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-business="${esc(b.id)}" data-slug="${esc(b.slug)}">
           <span><i class="bi bi-shop me-2"></i>${esc(b.name)}</span><span class="badge text-bg-light">${esc(ROLE[b.role] || '')}</span></button>`,
       )
       .join('');
@@ -316,7 +323,7 @@ const App = (() => {
       if (!b) return;
       try {
         await api('/auth/business', { method: 'POST', body: { businessId: b.dataset.business } });
-        location.reload();
+        location.href = `/${b.dataset.slug}/admin/`;
       } catch (err) { fail(err); }
     });
   }
@@ -325,7 +332,7 @@ const App = (() => {
   async function init(active, { needsBusiness = true, bottomNav = true } = {}) {
     me = await api('/auth/me');
     if (!me.session) {
-      location.href = '/admin/login?next=' + encodeURIComponent(location.pathname + location.search);
+      location.href = `${BASE}/login?next=` + encodeURIComponent(location.pathname + location.search);
       return null;
     }
     renderNav(active, { bottomNav });
@@ -337,7 +344,7 @@ const App = (() => {
   }
 
   return {
-    api, init, toast, fail, esc, modal, inviteDialog, onSubmit, formData, fillForm, confirmAction, param,
+    api, init, toast, slug: SLUG, base: BASE, fail, esc, modal, inviteDialog, onSubmit, formData, fillForm, confirmAction, param,
     fmtDate, fmtTime, fmtDateTime, fmtNum, fullName, initials, age, todayLocal, addDays,
     statusBadge, STATUS, KIND, ROLE,
     get me() { return me; },

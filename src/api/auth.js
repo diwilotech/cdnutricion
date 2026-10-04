@@ -22,7 +22,7 @@ export function routes(r) {
       email: c.user.email,
       name: c.user.name,
       session: {
-        businessId: s.business_id, businessName: s.business_name, role: s.role,
+        businessId: s.business_id, businessName: s.business_name, businessSlug: s.business_slug, role: s.role,
         readOnly: s.read_only, paidUntil: s.paid_until || null,
       },
       businesses: await userBusinesses(c.env, c.user),

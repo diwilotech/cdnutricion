@@ -29,13 +29,27 @@ scripts/seed.sql      datos de ejemplo (solo local)
 docs/prototipo/       prototipo visual "Cuerpo Vivo"
 ```
 
+### Multi-tenant por dirección
+
+Cada consultorio vive en su propia ruta, igual que Control de Citas ([src/lib/tenant.js](src/lib/tenant.js)):
+
+| Ruta | Qué es |
+|---|---|
+| `/<slug>` | página pública del consultorio (contacto, cómo entra el paciente) |
+| `/<slug>/admin/…` | panel; la API recibe el consultorio en el encabezado `x-business` y valida la membresía |
+| `/<slug>/p/#<token>` | seguimiento del paciente |
+| `/admin/…` | redirige al consultorio de origen (Referer) o al de la sesión |
+
+El propietario cambia la dirección en **Ajustes** (única, sin palabras reservadas como `admin` o `api`);
+Diwilo Web también puede fijarla con `PATCH /api/platform/businesses/:id { slug }`.
+
 ### Cuerpo Vivo
 
 Al abrir un paciente (desde Pacientes, Citas o Inicio) se abre `/admin/cuerpo?id=…`: figura animada, medidas con
 estimación antropométrica, salud (exámenes, riesgos, lesiones, medicamentos), evolución y plan de alimentación.
 La nutricionista puede cambiar a la vista *Paciente* para ver exactamente lo que ve el paciente.
 
-Con **Enlace del paciente** se genera un enlace privado `/p/#<token>` (se guarda solo su SHA-256; crear uno nuevo
+Con **Vista del paciente** se genera un enlace privado `/<slug>/p/#<token>` (se guarda solo su SHA-256; crear uno nuevo
 desactiva el anterior). El paciente ve su seguimiento sin usuario ni contraseña y puede marcar comidas, agua y metas.
 El token viaja en el fragmento `#`, así que no queda en logs ni en el `Referer`.
 

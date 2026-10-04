@@ -264,7 +264,7 @@
               ${ficha.files.length ? ficha.files.map((f) => `
                 <div class="list-group-item d-flex align-items-center gap-3">
                   <i class="bi ${icon(f.content_type)} fs-4 text-body-secondary"></i>
-                  <a class="flex-grow-1 text-truncate" href="/api/admin/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>
+                  <a class="flex-grow-1 text-truncate" href="/api/admin/files/${esc(f.id)}${App.slug ? `?b=${App.slug}` : ''}" target="_blank" rel="noopener">${esc(f.name)}</a>
                   <span class="small text-body-secondary text-nowrap hide-xs">${(f.size / 1024 / 1024).toFixed(1)} MB · ${App.fmtDate(f.created_at)}</span>
                   <button class="btn btn-sm btn-link text-danger" data-del-file="${esc(f.id)}" title="Eliminar"><i class="bi bi-trash"></i></button>
                 </div>`).join('') : '<div class="text-center text-body-secondary py-4 small">Sube fotos de progreso, exámenes o planes en PDF.</div>'}

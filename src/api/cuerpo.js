@@ -186,7 +186,8 @@ export function routes(r) {
         await sha256Hex(token), c.businessId, c.params.id, c.user.id,
       ),
     ]);
-    return json({ url: `${c.url.origin}/p/#${token}` }, 201);
+    const b = await db.first('SELECT slug FROM businesses WHERE id = ? /* business_id */', c.businessId);
+    return json({ url: `${c.url.origin}/${b.slug}/p/#${token}` }, 201);
   });
 
   r.delete('/api/admin/patients/:id/portal', 'tenant', async (c) => {

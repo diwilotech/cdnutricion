@@ -4,12 +4,13 @@
 //   GET    /api/platform/businesses
 //   POST   /api/platform/businesses                 { name, slug?, owner_email, owner_name?, paid_until }
 //   GET    /api/platform/businesses/:id
-//   PATCH  /api/platform/businesses/:id             { name?, paid_until? }
+//   PATCH  /api/platform/businesses/:id             { name?, slug?, paid_until? }  (slug = /<slug> del consultorio)
 //   POST   /api/platform/businesses/:id/users       { email, name?, role: owner|admin|staff } -> invite_path
 //   DELETE /api/platform/businesses/:id/users/:userId
 import { json, readJson, HttpError, str, oneOf, email } from '../lib/http.js';
 import { globalDb, uuid } from '../lib/db.js';
 import { createInvite, invitePath, isExpired } from '../lib/auth.js';
+import { RESERVED, validateSlug } from '../lib/tenant.js';
 
 const slugify = (s) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50);
@@ -71,8 +72,9 @@ export function routes(r) {
   r.post('/api/platform/businesses', 'platform', async (c) => {
     const body = await readJson(c.req);
     const name = str(body.name, { required: true, max: 120, label: 'Nombre' });
-    const slug = slugify(str(body.slug, { max: 50 }) || name);
-    if (!slug) throw new HttpError(400, 'Identificador inválido');
+    let slug = slugify(str(body.slug, { max: 50 }) || name);
+    if (slug.length < 2) throw new HttpError(400, 'Identificador inválido');
+    if (RESERVED.has(slug)) slug = `${slug}-consultorio`;  // /<slug> no puede chocar con rutas de la app
     const ownerEmail = email(body.owner_email, { required: true, label: 'Correo del propietario' });
     const db = globalDb(c.env);
     if (await db.first('SELECT 1 FROM businesses WHERE slug = ?', slug)) throw new HttpError(409, 'Ya existe un negocio con ese identificador');
@@ -99,6 +101,11 @@ export function routes(r) {
     if (body.name !== undefined) {
       stmts.push(db.prepare(`UPDATE businesses SET name = ?, updated_at = datetime('now') WHERE id = ?`,
         str(body.name, { required: true, max: 120, label: 'Nombre' }), c.params.id));
+    }
+    if (body.slug !== undefined) {
+      const slug = validateSlug(body.slug);
+      if (await db.first('SELECT 1 FROM businesses WHERE slug = ? AND id <> ?', slug, c.params.id)) throw new HttpError(409, 'Ese identificador ya existe');
+      stmts.push(db.prepare(`UPDATE businesses SET slug = ?, updated_at = datetime('now') WHERE id = ?`, slug, c.params.id));
     }
     if (body.paid_until !== undefined) {
       stmts.push(db.prepare(`UPDATE businesses SET paid_until = ?, updated_at = datetime('now') WHERE id = ?`,

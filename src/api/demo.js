@@ -1,6 +1,6 @@
 // Pacientes de ejemplo para conocer la app: historial de consultas, citas para los próximos días,
 // historia clínica, exámenes y recomendaciones. Se marcan con doc_id 'DEMO-…' y se pueden borrar.
-import { json, HttpError } from '../lib/http.js';
+import { json, readJson, HttpError } from '../lib/http.js';
 import { tenantDb, uuid } from '../lib/db.js';
 import { localNow, addDays } from '../lib/time.js';
 
@@ -101,65 +101,68 @@ const DEMO = [
 ];
 
 export function routes(r) {
+  // Índices de los ejemplos que faltan en este consultorio.
+  r.get('/api/admin/demo', 'manager', async (c) => {
+    const have = new Set((await tenantDb(c).all(`SELECT doc_id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, c.businessId)).map((x) => x.doc_id));
+    return json({ total: DEMO.length, missing: DEMO.map((_, i) => i).filter((i) => !have.has(`DEMO-${i + 1}`)) });
+  });
+
+  // Crea UN paciente de ejemplo por petición: así no se supera el límite de consultas a D1 por invocación.
   r.post('/api/admin/demo', 'manager', async (c) => {
+    const { index } = await readJson(c.req);
+    const i = Number(index), d = DEMO[i];
+    if (!Number.isInteger(i) || !d) throw new HttpError(400, 'Ejemplo inválido');
     const db = tenantDb(c);
     const bid = c.businessId;
-    // Crea solo los que falten: así se pueden sumar ejemplos nuevos sin duplicar los anteriores.
-    const have = new Set((await db.all(`SELECT doc_id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, bid)).map((x) => x.doc_id));
-    if (have.size >= DEMO.length) throw new HttpError(409, 'Ya están todos los pacientes de ejemplo.');
+    if (await db.first('SELECT 1 FROM patients WHERE business_id = ? AND doc_id = ?', bid, `DEMO-${i + 1}`)) return json({ ok: true, skipped: true });
     const today = localNow(c.timezone).date;
     const stmts = [];
-    let created = 0;
-    DEMO.forEach((d, i) => {
-      if (have.has(`DEMO-${i + 1}`)) return;
-      created++;
-      const pid = uuid();
+    const pid = uuid();
+    stmts.push(db.prepare(
+      `INSERT INTO patients (id, business_id, first_name, last_name, doc_id, sex, birth_date, phone, height_cm, goal, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      pid, bid, d.first, d.last, `DEMO-${i + 1}`, d.sex, d.birth, d.phone, d.h, d.goal, 'Paciente de ejemplo: se borra desde Ajustes.',
+    ));
+    // Consultas mensuales que terminan hace ~2 semanas, con la cita atendida de cada una.
+    d.hist.forEach(([w, f, m], j) => {
+      const date = addDays(today, -14 - (d.hist.length - 1 - j) * 28);
+      const last = j === d.hist.length - 1;
       stmts.push(db.prepare(
-        `INSERT INTO patients (id, business_id, first_name, last_name, doc_id, sex, birth_date, phone, height_cm, goal, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        pid, bid, d.first, d.last, `DEMO-${i + 1}`, d.sex, d.birth, d.phone, d.h, d.goal, 'Paciente de ejemplo: se borra desde Ajustes.',
+        `INSERT INTO consultations (id, business_id, patient_id, date, weight_kg, fat_pct, muscle_pct, measures, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        uuid(), bid, pid, date, w, f, m, last && Object.keys(d.measures).length ? JSON.stringify(d.measures) : null, c.user.id,
       ));
-      // Consultas mensuales que terminan hace ~2 semanas, con la cita atendida de cada una.
-      d.hist.forEach(([w, f, m], j) => {
-        const date = addDays(today, -14 - (d.hist.length - 1 - j) * 28);
-        const last = j === d.hist.length - 1;
-        stmts.push(db.prepare(
-          `INSERT INTO consultations (id, business_id, patient_id, date, weight_kg, fat_pct, muscle_pct, measures, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          uuid(), bid, pid, date, w, f, m, last && Object.keys(d.measures).length ? JSON.stringify(d.measures) : null, c.user.id,
-        ));
-        stmts.push(db.prepare(
-          `INSERT INTO appointments (id, business_id, patient_id, starts_at, kind, status) VALUES (?, ?, ?, ?, ?, 'done')`,
-          uuid(), bid, pid, `${date}T${d.appt[1]}`, j === 0 ? 'primera' : 'control',
-        ));
-      });
-      // Próxima cita en los próximos días.
       stmts.push(db.prepare(
-        `INSERT INTO appointments (id, business_id, patient_id, starts_at, kind, status, notes) VALUES (?, ?, ?, ?, ?, 'scheduled', ?)`,
-        uuid(), bid, pid, `${addDays(today, d.appt[0])}T${d.appt[1]}`, d.appt[2], d.appt[2] === 'primera' ? 'Traer exámenes recientes' : null,
+        `INSERT INTO appointments (id, business_id, patient_id, starts_at, kind, status) VALUES (?, ?, ?, ?, ?, 'done')`,
+        uuid(), bid, pid, `${date}T${d.appt[1]}`, j === 0 ? 'primera' : 'control',
       ));
-      if (d.clinical) {
-        stmts.push(db.prepare(
-          'INSERT INTO patient_profiles (patient_id, business_id, clinical) VALUES (?, ?, ?)',
-          pid, bid, JSON.stringify({ lesiones: [], riesgos: [], cond: [], meds: [], alergias: [], antecedentes: [], habitos: [], ...d.clinical }),
-        ));
-      }
-      const labs = !d.labs ? [] : Array.isArray(d.labs) ? d.labs : [[20, d.labs]];
-      for (const [daysAgo, vals] of labs) {
-        stmts.push(db.prepare(
-          'INSERT INTO patient_labs (id, business_id, patient_id, date, vals, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-          uuid(), bid, pid, addDays(today, -daysAgo), JSON.stringify(vals), c.user.id,
-        ));
-      }
-      if (d.rec) {
-        stmts.push(db.prepare(
-          'INSERT INTO recommendations (id, business_id, patient_id, text, author_id) VALUES (?, ?, ?, ?, ?)',
-          uuid(), bid, pid, d.rec, c.user.id,
-        ));
-      }
     });
+    // Próxima cita en los próximos días.
+    stmts.push(db.prepare(
+      `INSERT INTO appointments (id, business_id, patient_id, starts_at, kind, status, notes) VALUES (?, ?, ?, ?, ?, 'scheduled', ?)`,
+      uuid(), bid, pid, `${addDays(today, d.appt[0])}T${d.appt[1]}`, d.appt[2], d.appt[2] === 'primera' ? 'Traer exámenes recientes' : null,
+    ));
+    if (d.clinical) {
+      stmts.push(db.prepare(
+        'INSERT INTO patient_profiles (patient_id, business_id, clinical) VALUES (?, ?, ?)',
+        pid, bid, JSON.stringify({ lesiones: [], riesgos: [], cond: [], meds: [], alergias: [], antecedentes: [], habitos: [], ...d.clinical }),
+      ));
+    }
+    const labs = !d.labs ? [] : Array.isArray(d.labs) ? d.labs : [[20, d.labs]];
+    for (const [daysAgo, vals] of labs) {
+      stmts.push(db.prepare(
+        'INSERT INTO patient_labs (id, business_id, patient_id, date, vals, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        uuid(), bid, pid, addDays(today, -daysAgo), JSON.stringify(vals), c.user.id,
+      ));
+    }
+    if (d.rec) {
+      stmts.push(db.prepare(
+        'INSERT INTO recommendations (id, business_id, patient_id, text, author_id) VALUES (?, ?, ?, ?, ?)',
+        uuid(), bid, pid, d.rec, c.user.id,
+      ));
+    }
     await db.batch(stmts);
-    return json({ ok: true, patients: created }, 201);
+    return json({ ok: true, name: `${d.first} ${d.last}` }, 201);
   });
 
   // Borra los pacientes de ejemplo con todo lo suyo.

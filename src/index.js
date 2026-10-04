@@ -2,6 +2,7 @@
 import { Router } from './router.js';
 import { HttpError, errorResponse } from './lib/http.js';
 import { authenticate, loadSession } from './lib/auth.js';
+import { slugFromPath, businessBySlug, defaultSlug, isMember } from './lib/tenant.js';
 import * as authApi from './api/auth.js';
 import * as dashboardApi from './api/dashboard.js';
 import * as patientsApi from './api/patients.js';
@@ -11,9 +12,10 @@ import * as businessApi from './api/business.js';
 import * as platformApi from './api/platform.js';
 import * as cuerpoApi from './api/cuerpo.js';
 import * as demoApi from './api/demo.js';
+import * as publicApi from './api/public.js';
 
 const router = new Router();
-for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi]) {
+for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi, publicApi]) {
   mod.routes(router);
 }
 
@@ -35,15 +37,63 @@ async function handleApi(req, env, ctx, url) {
   return route.handler(c);
 }
 
-// Páginas /admin/*: sin sesión se redirige al login (correo + contraseña).
-async function handleAdminPage(req, env, url) {
-  const page = url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/admin';
-  const isPublic = page === '/admin/login' || url.pathname.startsWith('/admin/assets/');
-  if (!isPublic && !(await loadSession(req, env))) {
-    const next = encodeURIComponent(url.pathname + url.search);
-    return Response.redirect(`${url.origin}/admin/login?next=${next}`, 302);
+const assetAt = (env, req, path) => {
+  const u = new URL(req.url);
+  u.pathname = path;
+  return env.ASSETS.fetch(new Request(u, req));
+};
+
+// Las redirecciones de los assets (p. ej. /admin -> /admin/) deben conservar el prefijo /<slug>.
+function keepPrefix(res, prefix, url) {
+  const loc = res.status >= 300 && res.status < 400 && res.headers.get('location');
+  if (!loc) return res;
+  const l = new URL(loc, url);
+  return Response.redirect(`${url.origin}${prefix}${l.pathname}${l.search}`, 302);
+}
+
+const notFound = (msg) => new HttpError(404, msg || 'Esta página no existe.');
+
+// /<slug>, /<slug>/admin/…, /<slug>/p/
+async function handleBusinessPath(req, env, url, slug) {
+  const rest = url.pathname.slice(slug.length + 1) || '/';
+  const business = await businessBySlug(env, slug);
+  if (!business || business.status !== 'active') throw notFound('No encontramos este consultorio.');
+
+  if (rest === '/') return assetAt(env, req, '/negocio');
+  if (rest === '/p' || rest === '/p/') return assetAt(env, req, '/p/');
+  if (rest === '/admin' || rest.startsWith('/admin/')) {
+    if (rest.startsWith('/admin/assets/')) return assetAt(env, req, rest);
+    const page = rest.replace(/\.html$/, '').replace(/\/$/, '');
+    if (page !== '/admin/login' && !(await loadSession(req, env))) {
+      return Response.redirect(`${url.origin}/${slug}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
+    }
+    return keepPrefix(await assetAt(env, req, rest), `/${slug}`, url);
   }
-  return env.ASSETS.fetch(req);
+  throw notFound();
+}
+
+// /admin/… sin consultorio: se lleva al consultorio de donde viene (Referer) o al del usuario.
+async function handleLegacyAdmin(req, env, url) {
+  if (url.pathname.startsWith('/admin/assets/')) return env.ASSETS.fetch(req);
+  let slug = null;
+  const ref = req.headers.get('referer');
+  if (ref) {
+    try {
+      const r = new URL(ref);
+      const s = r.origin === url.origin && slugFromPath(r.pathname);
+      if (s && (r.pathname === `/${s}/admin` || r.pathname.startsWith(`/${s}/admin/`))) slug = s;
+    } catch { /* Referer inválido */ }
+  }
+  const session = await loadSession(req, env);
+  // Con sesión, solo se sigue al consultorio de origen si la persona es miembro (evita bucles).
+  if (slug && session && !(await isMember(env, session.user_id, slug))) slug = null;
+  if (!slug && session) slug = await defaultSlug(env, session);
+  if (slug) return Response.redirect(`${url.origin}/${slug}${url.pathname}${url.search}`, 302);
+  const isLogin = /^\/admin\/login(\.html)?$/.test(url.pathname);
+  if (!isLogin && !session) {
+    return Response.redirect(`${url.origin}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
+  }
+  return env.ASSETS.fetch(req);  // login genérico, o sesión sin consultorios
 }
 
 function withHeaders(res, headers) {
@@ -59,9 +109,11 @@ export default {
     try {
       if (isApi) return withHeaders(await handleApi(req, env, ctx, url), SECURITY_HEADERS);
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
-        return withHeaders(await handleAdminPage(req, env, url), SECURITY_HEADERS);
+        return withHeaders(await handleLegacyAdmin(req, env, url), SECURITY_HEADERS);
       }
       if (url.pathname === '/') return Response.redirect(`${url.origin}/admin/`, 302);
+      const slug = slugFromPath(url.pathname);
+      if (slug) return withHeaders(await handleBusinessPath(req, env, url, slug), SECURITY_HEADERS);
       return env.ASSETS.fetch(req);
     } catch (err) {
       if (isApi) return errorResponse(err);
@@ -71,7 +123,7 @@ export default {
       return new Response(
         `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
           `<title>Acceso</title><body style="font-family:system-ui;padding:2rem;max-width:32rem;margin:auto">` +
-          `<h1 style="font-size:1.25rem">No se pudo abrir el panel</h1><p>${msg.replace(/[<>&]/g, '')}</p></body>`,
+          `<h1 style="font-size:1.25rem">${status === 404 ? 'Página no encontrada' : 'No se pudo abrir la página'}</h1><p>${msg.replace(/[<>&]/g, '')}</p></body>`,
         { status, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } },
       );
     }

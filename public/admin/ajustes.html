@@ -18,6 +18,15 @@
           <form class="card-body" id="businessForm" novalidate>
             <fieldset id="businessFields">
               <div class="mb-3"><label class="form-label">Nombre *</label><input name="name" class="form-control" required maxlength="120"></div>
+              <div class="mb-3">
+                <label class="form-label" for="slugInput">Dirección del consultorio</label>
+                <div class="input-group">
+                  <span class="input-group-text small" id="slugPrefix"></span>
+                  <input name="slug" id="slugInput" class="form-control" pattern="[a-z0-9](?:[a-z0-9\-]{0,48}[a-z0-9])?" maxlength="50" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="form-text" id="slugHelp">Solo minúsculas, números y guiones. Ej.: <code>mateo-londono</code>. Al cambiarla, los enlaces anteriores dejan de funcionar.</div>
+                <div class="d-flex gap-2 flex-wrap mt-2" id="slugLinks"></div>
+              </div>
               <div class="row g-3 mb-3">
                 <div class="col-sm-6"><label class="form-label">Correo</label><input name="email" type="email" class="form-control"></div>
                 <div class="col-sm-6"><label class="form-label">Teléfono</label><input name="phone" class="form-control" maxlength="30"></div>
@@ -90,6 +99,16 @@
       async function loadBusiness() {
         const d = await App.api('/business');
         App.fillForm($('businessForm'), d.business);
+        $('slugPrefix').textContent = `${location.host}/`;
+        $('slugInput').disabled = me.session.role !== 'owner';
+        if (me.session.role !== 'owner') $('slugHelp').textContent = 'Solo el propietario puede cambiar la dirección.';
+        const pub = `${location.origin}/${d.business.slug}`;
+        $('slugLinks').innerHTML = `
+          <a class="btn btn-sm btn-outline-secondary" href="${pub}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Página pública</a>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-copy="${pub}/admin"><i class="bi bi-copy me-1"></i>Copiar enlace del panel</button>`;
+        $('slugLinks').querySelector('[data-copy]').onclick = async (ev) => {
+          try { await navigator.clipboard.writeText(ev.currentTarget.dataset.copy); App.toast('Enlace del panel copiado'); } catch { /* sin permiso */ }
+        };
         const row = (ok, icon, title, desc, action) => `
           <div class="d-flex align-items-start gap-3 mb-3">
             <i class="bi ${icon} fs-4 ${ok ? 'text-success' : 'text-body-secondary'}"></i>
@@ -141,13 +160,27 @@
       }
 
       if (!canManage) $('demoCard').classList.add('d-none');
+      // Se crean de a uno (cada paciente es una petición) para no superar los límites de la base de datos.
       $('demoCreate').onclick = async () => {
-        $('demoCreate').disabled = true;
+        const btn = $('demoCreate'), label = btn.innerHTML;
+        btn.disabled = true;
+        let created = 0;
         try {
-          const r = await App.api('/demo', { method: 'POST' });
-          App.toast(`${r.patients} pacientes de ejemplo creados, con citas para los próximos días`);
-        } catch (err) { App.fail(err); }
-        $('demoCreate').disabled = false;
+          const { missing, total } = await App.api('/demo');
+          if (!missing.length) { App.toast(`Ya están los ${total} pacientes de ejemplo`); return; }
+          for (const [n, index] of missing.entries()) {
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Creando ${n + 1} de ${missing.length}…`;
+            const r = await App.api('/demo', { method: 'POST', body: { index } });
+            if (!r.skipped) created++;
+          }
+          App.toast(`${created} pacientes de ejemplo creados, con citas para los próximos días`);
+        } catch (err) {
+          App.fail(err);
+          if (created) App.toast(`Se alcanzaron a crear ${created}. Vuelve a intentarlo para completar.`, 'warning');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = label;
+        }
       };
       $('demoDelete').onclick = async () => {
         if (!(await App.confirmAction('¿Borrar los pacientes de ejemplo con sus consultas, citas y datos?'))) return;
@@ -158,7 +191,11 @@
       };
 
       App.onSubmit($('businessForm'), async (d) => {
-        await App.api('/business', { method: 'PUT', body: d });
+        const r = await App.api('/business', { method: 'PUT', body: d });
+        if (r.slug && r.slug !== App.slug) {
+          location.href = `/${r.slug}/admin/ajustes`;  // la dirección cambió: el panel se mueve con ella
+          return;
+        }
         App.toast('Datos guardados');
         loadBusiness();
       });

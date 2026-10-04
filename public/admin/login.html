@@ -49,7 +49,14 @@
     (async () => {
       const $ = (id) => document.getElementById(id);
       const next = App.param('next');
-      const target = next && next.startsWith('/admin') ? next : '/admin/';
+      // Solo rutas internas del panel: /admin/… o /<consultorio>/admin/…
+      const target = next && /^\/(?:[a-z0-9-]+\/)?admin(?:\/|$)/.test(next) ? next : `${App.base}/`;
+      // Entrando por /<consultorio>/admin/login se muestra el nombre del consultorio.
+      if (App.slug) {
+        fetch(`/api/public/negocio/${App.slug}`).then((r) => (r.ok ? r.json() : null)).then((b) => {
+          if (b) { document.querySelector('h1').textContent = b.name; document.title = `Ingresar · ${b.name}`; }
+        }).catch(() => {});
+      }
 
       // El token viaja en el fragmento (#invite=…): no queda en logs ni en el Referer.
       async function showInvite(token, notice) {
