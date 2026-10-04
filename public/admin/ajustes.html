@@ -8,110 +8,39 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="/admin/assets/app.css" rel="stylesheet">
   <link href="/cv/card.css" rel="stylesheet">
-  <style>
-    .logo-edit { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; background: var(--cdn-accent-soft); color: var(--cdn-accent); display: grid; place-items: center; font-size: 2.2rem; flex: none; border: 3px solid var(--cdn-surface); box-shadow: 0 0 0 1px var(--cdn-line); }
-    .logo-edit img { width: 100%; height: 100%; object-fit: cover; }
-    @media (min-width: 992px) { .preview-sticky { position: sticky; top: 76px; } }
-  </style>
 </head>
 <body>
   <main class="container-xl py-4">
     <h1 class="page-title mb-3">Ajustes</h1>
 
-    <!-- Tarjeta digital de cada profesional. La del consultorio (dirección, logo, mapa base) se maneja desde Diwilo Web. -->
-    <div class="card mb-3" id="cardSection">
-      <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span class="fw-bold"><i class="bi bi-person-badge me-2"></i>Mi tarjeta digital</span>
-        <div class="d-flex gap-2">
-          <a class="btn btn-sm btn-outline-secondary" id="cardOpen" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Ver tarjeta</a>
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="cardCopy"><i class="bi bi-copy me-1"></i>Copiar enlace</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="row g-4">
-          <div class="col-lg-7">
-            <!-- Mi tarjeta (cualquier rol) -->
-            <form id="meForm" class="cdn-enter" novalidate>
-              <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="logo-edit" data-photo><i class="bi bi-person-arms-up"></i></div>
-                <div>
-                  <div class="fw-semibold mb-1">Tu foto</div>
-                  <div class="d-flex gap-2 flex-wrap">
-                    <label class="btn btn-sm btn-primary mb-0"><i class="bi bi-camera me-1"></i>Cambiar foto<input type="file" data-photo-input accept="image/*" hidden></label>
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-photo-remove hidden><i class="bi bi-trash"></i></button>
-                  </div>
-                  <div class="form-text">Se recorta en cuadrado. Es el ícono cuando instalan tu tarjeta.</div>
-                </div>
-              </div>
-              <div class="row g-3">
-                <div class="col-sm-6"><label class="form-label">Nombre en la tarjeta</label><input name="displayName" class="form-control" maxlength="80" placeholder="Paula Restrepo"></div>
-                <div class="col-sm-6"><label class="form-label">Especialidad</label><input name="specialty" class="form-control" maxlength="80" placeholder="Nutricionista clínica"></div>
-                <div class="col-sm-6"><label class="form-label">WhatsApp</label><input name="phone" type="tel" class="form-control" maxlength="30" placeholder="Si lo dejas vacío, se usa el del consultorio"></div>
-                <div class="col-sm-6"><label class="form-label">Correo público</label><input name="email" type="email" class="form-control" maxlength="254" placeholder="Opcional"></div>
-                <div class="col-12"><label class="form-label d-flex justify-content-between"><span>Descripción</span><span class="small text-body-secondary" data-count>0/500</span></label>
-                  <textarea name="bio" class="form-control" rows="3" maxlength="500" placeholder="Cuéntales a tus pacientes cómo los acompañas"></textarea></div>
-                <div class="col-sm-6"><label class="form-label">Horario</label><input name="hours" class="form-control" maxlength="120" data-fallback="hours"></div>
-                <div class="col-sm-6"><label class="form-label">Dirección donde atiendes</label><input name="address" class="form-control" maxlength="200" data-fallback="address"></div>
-                <div class="col-12">
-                  <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" id="showMap" name="showMap">
-                    <label class="form-check-label fw-semibold" for="showMap">Mostrar mapa con mi ubicación</label>
-                  </div>
-                  <div id="mapFields" class="vc-panel" hidden>
-                    <div class="small text-body-secondary mb-2">Ubica dónde atiendes de alguna de estas formas:</div>
-                    <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="useLocation"><i class="bi bi-crosshair me-1"></i>Usar mi ubicación actual</button>
-                    <div class="input-group input-group-sm mb-2">
-                      <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-                      <input class="form-control" id="mapsLink" placeholder="…o pega aquí el enlace de Google Maps">
-                    </div>
-                    <div class="row g-2">
-                      <div class="col-6"><input name="lat" class="form-control form-control-sm" inputmode="decimal" placeholder="Latitud"></div>
-                      <div class="col-6"><input name="lng" class="form-control form-control-sm" inputmode="decimal" placeholder="Longitud"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12"><label class="form-label">Dirección de tu tarjeta</label>
-                  <div class="input-group"><span class="input-group-text small" id="meHandlePrefix"></span>
-                    <input name="handle" class="form-control" maxlength="40" pattern="[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?" autocomplete="off" spellcheck="false"></div></div>
-                <div class="col-12">
-                  <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1"><span>Enlaces</span>
-                    <span class="d-flex gap-1 flex-wrap" data-presets></span></label>
-                  <div data-rows class="d-flex flex-column gap-2"></div>
-                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addlink><i class="bi bi-plus-lg me-1"></i>Agregar enlace</button>
-                </div>
-              </div>
-              <div class="small text-body-secondary mt-3"><i class="bi bi-info-circle me-1"></i>Lo que dejes vacío (WhatsApp, horario, dirección, mapa o enlaces) se toma del consultorio.</div>
-              <button type="submit" class="btn btn-primary mt-3"><i class="bi bi-check2 me-1"></i>Guardar mi tarjeta</button>
-            </form>
-
-          </div>
-          <div class="col-lg-5">
-            <div class="preview-sticky">
-              <div class="small text-body-secondary text-center mb-2"><i class="bi bi-phone me-1"></i>Así se ve la tarjeta</div>
-              <div class="vc-phone mx-auto" style="max-width:380px"><div id="cardPreview"></div></div>
+    <div class="row g-3">
+      <!-- Datos del negocio: su tarjeta de contacto, editable sobre la misma tarjeta -->
+      <div class="col-lg-7">
+        <div class="card h-100">
+          <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-shop me-2"></i>Datos del negocio</span>
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-outline-secondary" id="bizOpen" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Ver tarjeta</a>
+              <button type="button" class="btn btn-sm btn-primary" id="bizSave" hidden><i class="bi bi-check2 me-1"></i>Guardar</button>
             </div>
           </div>
+          <div class="card-body">
+            <p class="small text-body-secondary text-center mb-3" id="bizHint">Toca cualquier dato de la tarjeta para editarlo: logo, nombre, descripción, contacto, dirección, mapa, horario y redes.</p>
+            <div id="bizCard" style="max-width:440px" class="mx-auto"></div>
+            <div class="text-center mt-3"><button type="button" class="btn btn-primary" id="bizSave2" hidden><i class="bi bi-check2 me-1"></i>Guardar datos del negocio</button></div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="row g-3">
-      <div class="col-lg-6">
+      <div class="col-lg-5 d-flex flex-column gap-3">
         <div class="card">
-          <div class="card-header py-3"><i class="bi bi-shop me-2"></i>Datos del negocio</div>
-          <form class="card-body" id="businessForm" novalidate>
-            <fieldset id="businessFields">
-              <div class="mb-3"><label class="form-label">Nombre *</label><input name="name" class="form-control" required maxlength="120"></div>
-              <div class="mb-3">
-                <label class="form-label">Dirección del consultorio</label>
-                <div class="input-group"><span class="input-group-text small"><i class="bi bi-link-45deg"></i></span><input class="form-control" id="slugView" readonly></div>
-                <div class="form-text">La dirección del consultorio se administra desde Diwilo.</div>
-                <div class="d-flex gap-2 flex-wrap mt-2" id="slugLinks"></div>
-              </div>
-              <div class="row g-3 mb-3">
-                <div class="col-sm-6"><label class="form-label">Correo</label><input name="email" type="email" class="form-control"></div>
-                <div class="col-sm-6"><label class="form-label">Teléfono</label><input name="phone" class="form-control" maxlength="30"></div>
-              </div>
+          <div class="card-header py-3"><i class="bi bi-sliders me-2"></i>Configuración</div>
+          <form class="card-body" id="configForm" novalidate>
+            <fieldset id="configFields">
+              <label class="form-label">Dirección web del negocio</label>
+              <div class="input-group mb-1"><span class="input-group-text"><i class="bi bi-link-45deg"></i></span><input class="form-control" id="slugView" readonly></div>
+              <div class="form-text mb-2">La dirección web se administra desde Diwilo.</div>
+              <div class="d-flex gap-2 flex-wrap mb-3" id="slugLinks"></div>
               <div class="mb-3"><label class="form-label">Zona horaria</label>
                 <select name="timezone" class="form-select">
                   <option>America/Bogota</option><option>America/Mexico_City</option><option>America/Lima</option>
@@ -120,21 +49,21 @@
                 </select></div>
               <div class="mb-3"><label class="form-label">Instancia de WhatsApp (Evolution API)</label>
                 <input name="wa_instance" class="form-control" maxlength="80" placeholder="nombre-de-la-instancia">
-                <div class="form-text">Nombre de la instancia conectada al número de WhatsApp del negocio.</div></div>
-              <button type="submit" class="btn btn-primary">Guardar</button>
+                <div class="form-text">Para los recordatorios de citas por WhatsApp.</div></div>
+              <button type="submit" class="btn btn-outline-primary"><i class="bi bi-check2 me-1"></i>Guardar configuración</button>
             </fieldset>
           </form>
         </div>
 
-        <div class="card mt-3">
+        <div class="card">
           <div class="card-header py-3"><i class="bi bi-plug me-2"></i>Integraciones</div>
           <div class="card-body" id="integrations"></div>
         </div>
 
-        <div class="card mt-3" id="demoCard">
+        <div class="card" id="demoCard">
           <div class="card-header py-3"><i class="bi bi-people me-2"></i>Pacientes de ejemplo</div>
           <div class="card-body">
-            <p class="small text-body-secondary">Crea 10 pacientes de ejemplo (incluidos 3 casos de leve a grave) con historial de consultas, citas para los próximos días, historia clínica, exámenes y recomendaciones, para conocer la app. Se identifican con el documento <code>DEMO-</code> y se borran con un clic. Si ya creaste algunos, solo se agregan los que falten.</p>
+            <p class="small text-body-secondary">Crea 10 pacientes de ejemplo (incluidos 3 casos de leve a grave) con historial, citas para los próximos días, historia clínica, exámenes y recomendaciones. Se identifican con el documento <code>DEMO-</code>; si ya creaste algunos, solo se agregan los que falten.</p>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-primary" id="demoCreate"><i class="bi bi-magic me-1"></i>Crear pacientes de ejemplo</button>
               <button class="btn btn-outline-danger" id="demoDelete"><i class="bi bi-trash me-1"></i>Borrar ejemplos</button>
@@ -142,23 +71,27 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="col-lg-6">
-        <div class="card">
-          <div class="card-header py-3"><i class="bi bi-people me-2"></i>Equipo</div>
-          <div class="list-group list-group-flush" id="team"></div>
-          <form class="card-body border-top" id="teamForm" novalidate>
-            <div class="small fw-semibold mb-2">Agregar miembro</div>
-            <div class="row g-2">
-              <div class="col-sm-5"><input name="email" type="email" class="form-control" placeholder="correo@ejemplo.com" required></div>
-              <div class="col-sm-4"><input name="name" class="form-control" placeholder="Nombre" maxlength="100"></div>
-              <div class="col-sm-3"><select name="role" class="form-select">
-                <option value="staff">Equipo</option><option value="admin">Administrador</option><option value="owner">Propietario</option></select></div>
-            </div>
-            <div class="form-text mb-2">Si la persona aún no tiene cuenta, se genera un link para que cree su contraseña.</div>
-            <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Agregar</button>
-          </form>
-        </div>
+    <!-- Equipo: cada miembro con su tarjeta de contacto; el lápiz abre la tarjeta para editarla ahí mismo -->
+    <div class="card mt-3">
+      <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people me-2"></i>Equipo <span class="text-body-secondary fw-normal small" id="teamCount"></span></span>
+        <span class="small text-body-secondary d-none d-sm-inline"><i class="bi bi-pencil-square me-1"></i>abre la tarjeta para editarla</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3" id="team"></div>
+        <form class="mt-4 pt-3 border-top" id="teamForm" novalidate>
+          <div class="small fw-semibold mb-2">Agregar miembro</div>
+          <div class="row g-2">
+            <div class="col-sm-5"><input name="email" type="email" class="form-control" placeholder="correo@ejemplo.com" required></div>
+            <div class="col-sm-4"><input name="name" class="form-control" placeholder="Nombre" maxlength="100"></div>
+            <div class="col-sm-3"><select name="role" class="form-select">
+              <option value="staff">Equipo</option><option value="admin">Administrador</option><option value="owner">Propietario</option></select></div>
+          </div>
+          <div class="form-text mb-2">Si la persona aún no tiene cuenta, se genera un link para que cree su contraseña.</div>
+          <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Agregar</button>
+        </form>
       </div>
     </div>
   </main>
@@ -166,6 +99,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/admin/assets/app.js"></script>
   <script src="/cv/card.js"></script>
+  <script src="/admin/assets/card-editor.js"></script>
   <script>
     (async () => {
       const me = await App.init('ajustes');
@@ -173,22 +107,63 @@
       const { esc } = App;
       const $ = (id) => document.getElementById(id);
       const canManage = ['owner', 'admin'].includes(me.session.role);
-      if (!canManage) {
-        $('businessFields').disabled = true;
-        $('teamForm').classList.add('d-none');
-      }
+      let biz = null, business = null, bizEditor = null;
+      const upload = async (endpoint, blob) => {
+        const fd = new FormData();
+        fd.append('file', blob, 'foto.png');
+        const r = await App.api(endpoint, { method: 'POST', form: fd });
+        App.toast('Foto actualizada');
+        return r.logo || r.photo;
+      };
 
+      // ---------- datos del negocio (tarjeta editable) + configuración ----------
       async function loadBusiness() {
-        const d = await App.api('/business');
-        App.fillForm($('businessForm'), d.business);
-        $('slugView').value = `${location.host}/${d.business.slug}`;
-        const pub = `${location.origin}/${d.business.slug}`;
+        const [d, card] = await Promise.all([App.api('/business'), App.api('/card')]);
+        business = d.business; biz = card;
+        App.fillForm($('configForm'), business);
+        $('configFields').disabled = !canManage;
+        const pub = `${location.origin}/${business.slug}`;
+        $('slugView').value = `${location.host}/${business.slug}`;
+        $('bizOpen').href = pub;
         $('slugLinks').innerHTML = `
           <a class="btn btn-sm btn-outline-secondary" href="${pub}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Página pública</a>
           <button type="button" class="btn btn-sm btn-outline-secondary" data-copy="${pub}/admin"><i class="bi bi-copy me-1"></i>Copiar enlace del panel</button>`;
         $('slugLinks').querySelector('[data-copy]').onclick = async (ev) => {
           try { await navigator.clipboard.writeText(ev.currentTarget.dataset.copy); App.toast('Enlace del panel copiado'); } catch { /* sin permiso */ }
         };
+        if (canManage) {
+          bizEditor = CardEditor.mount($('bizCard'), {
+            kind: 'business', data: biz,
+            onPhoto: (blob) => upload('/card/logo', blob),
+            onPhotoRemove: () => App.api('/card/logo', { method: 'DELETE' }),
+          });
+          $('bizSave').hidden = false; $('bizSave2').hidden = false;
+        } else {
+          $('bizHint').textContent = 'Solo propietarios y administradores editan los datos del negocio.';
+          CardView.render($('bizCard'), biz, { preview: true });
+        }
+        integrations(d);
+      }
+
+      $('bizSave').onclick = $('bizSave2').onclick = async (ev) => {
+        const btn = ev.currentTarget; btn.disabled = true;
+        try {
+          const body = bizEditor.read();
+          const r = await App.api('/card', { method: 'PUT', body });
+          Object.assign(biz, { name: body.name, phone: body.phone, email: body.email, card: r.card });
+          Object.assign(business, { name: body.name, phone: body.phone, email: body.email });
+          App.toast('Datos del negocio guardados');
+          loadTeam();
+        } catch (err) { App.fail(err); }
+        btn.disabled = false;
+      };
+
+      App.onSubmit($('configForm'), async (d) => {
+        await App.api('/business', { method: 'PUT', body: { name: business.name, email: business.email, phone: business.phone, ...d } });
+        App.toast('Configuración guardada');
+      });
+
+      function integrations(d) {
         const row = (ok, icon, title, desc, action) => `
           <div class="d-flex align-items-start gap-3 mb-3">
             <i class="bi ${icon} fs-4 ${ok ? 'text-success' : 'text-body-secondary'}"></i>
@@ -198,50 +173,124 @@
               ${ok && canManage ? action : ''}</div>
           </div>`;
         $('integrations').innerHTML =
-          row(d.integrations.whatsapp && !!d.business.wa_instance, 'bi-whatsapp', 'WhatsApp',
-            'Recordatorios de citas vía Evolution API.',
-            `<form class="input-group input-group-sm mt-2" id="waTest" style="max-width:20rem">
-               <input name="phone" class="form-control" placeholder="Número de prueba" required>
+          row(d.integrations.whatsapp && !!d.business.wa_instance, 'bi-whatsapp', 'WhatsApp', 'Recordatorios de citas vía Evolution API.',
+            `<form class="input-group input-group-sm mt-2" id="waTest" style="max-width:20rem"><input name="phone" class="form-control" placeholder="Número de prueba" required>
                <button class="btn btn-outline-secondary" type="submit">Probar</button></form>`) +
-          row(d.integrations.email, 'bi-envelope', 'Correo (Gmail SMTP)',
-            'Envío de correos a pacientes.',
-            `<form class="input-group input-group-sm mt-2" id="mailTest" style="max-width:20rem">
-               <input name="to" type="email" class="form-control" placeholder="correo de prueba" required>
+          row(d.integrations.email, 'bi-envelope', 'Correo (Gmail SMTP)', 'Envío de correos a pacientes.',
+            `<form class="input-group input-group-sm mt-2" id="mailTest" style="max-width:20rem"><input name="to" type="email" class="form-control" placeholder="correo de prueba" required>
                <button class="btn btn-outline-secondary" type="submit">Probar</button></form>`);
-        if ($('waTest')) App.onSubmit($('waTest'), async (f) => {
-          await App.api('/integrations/whatsapp/test', { method: 'POST', body: f });
-          App.toast('Mensaje de prueba enviado');
-        });
-        if ($('mailTest')) App.onSubmit($('mailTest'), async (f) => {
-          await App.api('/integrations/email/test', { method: 'POST', body: f });
-          App.toast('Correo de prueba enviado');
-        });
+        if ($('waTest')) App.onSubmit($('waTest'), async (f) => { await App.api('/integrations/whatsapp/test', { method: 'POST', body: f }); App.toast('Mensaje de prueba enviado'); });
+        if ($('mailTest')) App.onSubmit($('mailTest'), async (f) => { await App.api('/integrations/email/test', { method: 'POST', body: f }); App.toast('Correo de prueba enviado'); });
       }
 
+      // ---------- equipo: tarjeta de contacto de cada uno ----------
+      let team = [];
       async function loadTeam() {
-        const { items } = await App.api('/team');
-        $('team').innerHTML = items.map((u) => `
-          <div class="list-group-item d-flex align-items-center gap-3">
-            <span class="avatar">${esc((u.name || u.email)[0].toUpperCase())}</span>
-            <div class="flex-grow-1 text-truncate">
-              <div class="fw-medium text-truncate">${esc(u.name || u.email)}</div>
-              <div class="small text-body-secondary text-truncate">${esc(u.email)}${u.has_password ? '' : ' · <em>invitación pendiente</em>'}</div>
-            </div>
-            ${u.handle && App.slug ? `<a class="btn btn-sm btn-link text-body-secondary" href="/${App.slug}/${esc(u.handle)}" target="_blank" rel="noopener" title="Ver su tarjeta"><i class="bi bi-person-badge"></i></a>` : ''}
-            <span class="badge text-bg-light">${App.ROLE[u.role]}</span>
-            ${canManage && u.id !== me.userId ? `
-              <div class="dropdown">
-                <button class="btn btn-sm btn-link text-body-secondary" data-bs-toggle="dropdown" aria-label="Opciones"><i class="bi bi-three-dots-vertical"></i></button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><button class="dropdown-item" data-reset="${esc(u.id)}"><i class="bi bi-link-45deg me-2"></i>Link para crear contraseña</button></li>
-                  <li><button class="dropdown-item text-danger" data-remove="${esc(u.id)}"><i class="bi bi-person-dash me-2"></i>Quitar del equipo</button></li>
-                </ul>
-              </div>` : ''}
-          </div>`).join('') || '<div class="empty small">Sin miembros</div>';
+        const r = await App.api('/team');
+        team = r.items;
+        $('teamCount').textContent = `· ${team.length}`;
+        $('team').innerHTML = team.map((u) => {
+          const mine = u.id === me.userId, editable = mine || canManage;
+          const initials = String(u.displayName || u.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+          const url = u.handle ? `${location.origin}/${u.slug}/${u.handle}` : null;
+          return `
+            <div class="col-sm-6 col-xl-4">
+              <div class="team-card">
+                <div class="team-avatar">${u.photo ? `<img src="${esc(u.photo)}" alt="">` : esc(initials)}</div>
+                <div class="flex-grow-1" style="min-width:0">
+                  <div class="fw-semibold text-truncate">${esc(u.displayName || u.email)}${mine ? ' <span class="badge text-bg-light">Tú</span>' : ''}</div>
+                  <div class="small text-body-secondary text-truncate">${esc(u.specialty || u.email)}</div>
+                  <div class="small mt-1 d-flex gap-2 align-items-center flex-wrap">
+                    <span class="badge text-bg-light">${App.ROLE[u.role]}</span>
+                    ${u.has_password ? '' : '<span class="badge text-bg-warning">Invitación pendiente</span>'}
+                    ${url ? `<a href="${url}" target="_blank" rel="noopener" class="text-body-secondary" title="Ver su tarjeta"><i class="bi bi-box-arrow-up-right"></i></a>
+                      <a href="#" class="text-body-secondary" data-copy="${url}" title="Copiar enlace de su tarjeta"><i class="bi bi-copy"></i></a>` : ''}
+                  </div>
+                </div>
+                <div class="d-flex flex-column gap-1 align-items-center">
+                  ${editable ? `<button class="btn btn-primary team-edit" data-edit="${esc(u.id)}" title="Editar tarjeta"><i class="bi bi-pencil-square"></i></button>` : ''}
+                  ${canManage && !mine ? `<div class="dropdown">
+                      <button class="btn btn-sm btn-link text-body-secondary p-0" data-bs-toggle="dropdown" aria-label="Opciones"><i class="bi bi-three-dots"></i></button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" data-reset="${esc(u.id)}"><i class="bi bi-link-45deg me-2"></i>Link para crear contraseña</button></li>
+                        <li><button class="dropdown-item text-danger" data-remove="${esc(u.id)}"><i class="bi bi-person-dash me-2"></i>Quitar del equipo</button></li>
+                      </ul></div>` : ''}
+                </div>
+              </div>
+            </div>`;
+        }).join('') || '<div class="col-12 text-center text-body-secondary small py-3">Sin miembros</div>';
       }
 
+      // Lápiz: abre la tarjeta del miembro y se edita ahí mismo.
+      async function editMember(userId) {
+        let data;
+        try { data = await App.api(`/team/${userId}/card`); } catch (err) { App.fail(err); return; }
+        const mine = data.userId === me.userId;
+        const { el, hide } = App.modal(`
+          <div class="modal-header"><h5 class="modal-title">${mine ? 'Mi tarjeta' : `Tarjeta de ${esc(data.card.displayName || data.name || data.email)}`}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+          <div class="modal-body" style="background:var(--cdn-bg)"><div data-editor style="max-width:440px" class="mx-auto"></div></div>
+          <div class="modal-footer flex-column align-items-stretch gap-2">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">${esc(location.host)}/${esc(data.slug)}/</span>
+              <input class="form-control" data-handle value="${esc(data.handle)}" maxlength="40" spellcheck="false" aria-label="Dirección de la tarjeta">
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+              <a class="btn btn-outline-secondary" target="_blank" rel="noopener" href="${location.origin}/${esc(data.slug)}/${esc(data.handle)}"><i class="bi bi-box-arrow-up-right me-1"></i>Ver</a>
+              <button class="btn btn-primary" data-save><i class="bi bi-check2 me-1"></i>Guardar tarjeta</button>
+            </div>
+          </div>`);
+        el.querySelector('.modal-dialog').classList.add('modal-dialog-scrollable', 'modal-fullscreen-sm-down');
+        const editor = CardEditor.mount(el.querySelector('[data-editor]'), {
+          kind: 'member',
+          data: { name: data.card.displayName || data.name || '', org: biz.name, logo: data.photo, card: data.card },
+          fallback: { phone: biz.phone, card: biz.card },
+          onPhoto: (blob) => upload(`/team/${userId}/card/photo`, blob),
+          onPhotoRemove: () => App.api(`/team/${userId}/card/photo`, { method: 'DELETE' }),
+        });
+        el.querySelector('[data-save]').onclick = async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true;
+          try {
+            const body = { ...editor.read(), handle: el.querySelector('[data-handle]').value.trim() };
+            await App.api(`/team/${userId}/card`, { method: 'PUT', body });
+            App.toast('Tarjeta guardada');
+            hide();
+            loadTeam();
+          } catch (err) { App.fail(err); btn.disabled = false; }
+        };
+      }
+
+      $('team').addEventListener('click', async (ev) => {
+        const copy = ev.target.closest('[data-copy]');
+        if (copy) { ev.preventDefault(); try { await navigator.clipboard.writeText(copy.dataset.copy); App.toast('Enlace de la tarjeta copiado'); } catch { /* sin permiso */ } return; }
+        const b = ev.target.closest('button[data-edit],button[data-reset],button[data-remove]');
+        if (!b) return;
+        try {
+          if (b.dataset.edit) return editMember(b.dataset.edit);
+          if (b.dataset.reset) {
+            const r = await App.api(`/team/${b.dataset.reset}/invite`, { method: 'POST' });
+            App.inviteDialog(r.inviteUrl);
+            return;
+          }
+          if (!(await App.confirmAction('¿Quitar a esta persona del equipo?'))) return;
+          await App.api(`/team/${b.dataset.remove}`, { method: 'DELETE' });
+          App.toast('Miembro eliminado');
+          loadTeam();
+        } catch (err) { App.fail(err); }
+      });
+
+      if (!canManage) $('teamForm').classList.add('d-none');
+      App.onSubmit($('teamForm'), async (d) => {
+        const r = await App.api('/team', { method: 'POST', body: d });
+        $('teamForm').reset();
+        App.toast('Miembro agregado');
+        if (r.inviteUrl) App.inviteDialog(r.inviteUrl, 'Invitación al equipo');
+        loadTeam();
+      });
+
+      // ---------- pacientes de ejemplo (de a uno: no supera los límites de la base de datos) ----------
       if (!canManage) $('demoCard').classList.add('d-none');
-      // Se crean de a uno (cada paciente es una petición) para no superar los límites de la base de datos.
       $('demoCreate').onclick = async () => {
         const btn = $('demoCreate'), label = btn.innerHTML;
         btn.disabled = true;
@@ -258,10 +307,7 @@
         } catch (err) {
           App.fail(err);
           if (created) App.toast(`Se alcanzaron a crear ${created}. Vuelve a intentarlo para completar.`, 'warning');
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = label;
-        }
+        } finally { btn.disabled = false; btn.innerHTML = label; }
       };
       $('demoDelete').onclick = async () => {
         if (!(await App.confirmAction('¿Borrar los pacientes de ejemplo con sus consultas, citas y datos?'))) return;
@@ -271,185 +317,10 @@
         } catch (err) { App.fail(err); }
       };
 
-      // ---------- tarjetas digitales: la mía (profesional) y la del consultorio ----------
-      const LINK_PRESETS = [['Instagram', 'https://instagram.com/'], ['Facebook', 'https://facebook.com/'], ['TikTok', 'https://tiktok.com/@'], ['Sitio web', 'https://']];
-      // Lee también campos deshabilitados (quien no administra igual ve la vista previa).
-      const vals = (form) => Object.fromEntries([...form.elements].filter((e) => e.name).map((e) => [e.name, e.type === 'checkbox' ? e.checked : e.value.trim()]));
-      const linkRow = (l = {}) => `<div class="input-group input-group-sm" data-link>
-          <span class="input-group-text"><i class="bi ${CardView.linkIcon(l.url || '')}"></i></span>
-          <input class="form-control" data-l="label" value="${App.esc(l.label || '')}" placeholder="Nombre" maxlength="40" style="max-width:9.5rem">
-          <input class="form-control" data-l="url" value="${App.esc(l.url || '')}" placeholder="https://…" maxlength="300">
-          <button type="button" class="btn btn-outline-danger" data-unlink aria-label="Quitar enlace"><i class="bi bi-x-lg"></i></button>
-        </div>`;
-      const readLinks = (form) => [...form.querySelectorAll('[data-link]')]
-        .map((r) => ({ label: r.querySelector('[data-l=label]').value.trim(), url: r.querySelector('[data-l=url]').value.trim() })).filter((l) => l.label || l.url);
-
-      // Foto: se recorta en cuadrado de 512 px en el navegador antes de subirla.
-      function squarePng(file) {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            const side = Math.min(img.width, img.height), canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 512;
-            canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 512, 512);
-            URL.revokeObjectURL(img.src);
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo procesar la imagen'))), 'image/png');
-          };
-          img.onerror = () => reject(new Error('Ese archivo no es una imagen válida'));
-          img.src = URL.createObjectURL(file);
-        });
-      }
-
-      let biz = null, mine = null, previewTimer;
-      const form = $('meForm'), q = (sel) => form.querySelector(sel);
-
-      // Datos que verá la tarjeta pública: lo mío, y lo del consultorio donde lo deje vacío.
-      function currentCard() {
-        const b = vals($('businessForm'));  // nombre y teléfono del consultorio, en vivo
-        const m = vals(form), links = readLinks(form), bc = biz.card || {};
-        const lat = m.lat === '' ? null : Number(m.lat), lng = m.lng === '' ? null : Number(m.lng);
-        const ownLoc = m.address || (lat != null && lng != null);
-        return {
-          name: m.displayName || mine.name || b.name, org: b.name || biz.name, slug: biz.slug, path: `${biz.slug}/${mine.handle}`,
-          logo: mine.photo, phone: m.phone || b.phone || biz.phone, email: m.email || null,
-          card: {
-            specialty: m.specialty, bio: m.bio, hours: m.hours || bc.hours,
-            ...(ownLoc ? { address: m.address, lat, lng, showMap: m.showMap } : { address: bc.address, lat: bc.lat, lng: bc.lng, showMap: bc.showMap }),
-            links: links.length ? links : bc.links || [],
-          },
-        };
-      }
-      function preview() {
-        clearTimeout(previewTimer);
-        previewTimer = setTimeout(() => {
-          if (!biz || !mine) return;
-          CardView.render($('cardPreview'), currentCard(), { preview: true });
-          $('mapFields').hidden = !form.elements.showMap.checked;
-          q('[data-photo]').innerHTML = mine.photo ? `<img src="${App.esc(mine.photo)}" alt="">` : '<i class="bi bi-person-arms-up"></i>';
-          q('[data-photo-remove]').hidden = !mine.photo;
-          q('[data-count]').textContent = `${form.elements.bio.value.length}/500`;
-          form.querySelectorAll('[data-link]').forEach((r) => { r.querySelector('.input-group-text i').className = `bi ${CardView.linkIcon(r.querySelector('[data-l=url]').value)}`; });
-        }, 120);
-      }
-
-      // Enlaces (con atajos), foto recortada y vista previa en vivo.
-      q('[data-presets]').innerHTML = LINK_PRESETS.map(([n, u]) => `<button type="button" class="btn btn-sm btn-light py-0 px-2" data-preset="${n}|${u}"><i class="bi ${CardView.linkIcon(u + 'x')} me-1"></i>${n}</button>`).join('');
-      const full = () => form.querySelectorAll('[data-link]').length >= 8 && (App.toast('Máximo 8 enlaces', 'warning'), true);
-      q('[data-presets]').onclick = (ev) => {
-        const b = ev.target.closest('[data-preset]'); if (!b || full()) return;
-        const [label, url] = b.dataset.preset.split('|');
-        q('[data-rows]').insertAdjacentHTML('beforeend', linkRow({ label, url }));
-        const input = q('[data-rows]').lastElementChild.querySelector('[data-l=url]'); input.focus(); input.setSelectionRange(url.length, url.length);
-        preview();
-      };
-      q('[data-addlink]').onclick = () => { if (full()) return; q('[data-rows]').insertAdjacentHTML('beforeend', linkRow()); q('[data-rows]').lastElementChild.querySelector('input').focus(); preview(); };
-      q('[data-rows]').onclick = (ev) => { if (ev.target.closest('[data-unlink]')) { ev.target.closest('[data-link]').remove(); preview(); } };
-      form.addEventListener('input', preview);
-      form.addEventListener('change', preview);
-      $('businessForm').addEventListener('input', preview);
-      q('[data-photo-input]').onchange = async (ev) => {
-        const file = ev.target.files[0]; ev.target.value = '';
-        if (!file) return;
-        try {
-          const fd = new FormData();
-          fd.append('file', await squarePng(file), 'foto.png');
-          mine.photo = (await App.api('/card/me/photo', { method: 'POST', form: fd })).photo;
-          preview(); App.toast('Foto actualizada');
-        } catch (err) { App.fail(err); }
-      };
-      q('[data-photo-remove]').onclick = async () => {
-        if (!(await App.confirmAction('¿Quitar tu foto?'))) return;
-        try { await App.api('/card/me/photo', { method: 'DELETE' }); mine.photo = null; preview(); } catch (err) { App.fail(err); }
-      };
-
-      // "Ver tarjeta" y "Copiar enlace" usan la dirección GUARDADA (una sin guardar aún no existe).
-      function paintLinks() {
-        const pub = `${location.origin}/${biz.slug}/${mine.handle}`;
-        $('cardOpen').href = pub;
-        $('cardCopy').onclick = async () => { try { await navigator.clipboard.writeText(pub); App.toast('Enlace de tu tarjeta copiado'); } catch { /* sin permiso */ } };
-      }
-
-      async function loadCard() {
-        [biz, mine] = await Promise.all([App.api('/card'), App.api('/card/me')]);
-        const m = mine.card || {}, bc = biz.card || {};
-        App.fillForm(form, {
-          displayName: m.displayName || mine.name || '', specialty: m.specialty, phone: m.phone, email: m.email, bio: m.bio, handle: mine.handle,
-          hours: m.hours, address: m.address, showMap: !!m.showMap, lat: m.lat ?? '', lng: m.lng ?? '',
-        });
-        q('[data-rows]').innerHTML = (m.links || []).map(linkRow).join('');
-        $('meHandlePrefix').textContent = `${location.host}/${biz.slug}/`;
-        // Lo que no pongas se toma del consultorio: se muestra como sugerencia en cada campo.
-        form.elements.phone.placeholder = biz.phone ? `Del consultorio: ${biz.phone}` : 'Tu número de WhatsApp';
-        form.elements.hours.placeholder = bc.hours ? `Del consultorio: ${bc.hours}` : 'Lun a Vie · 7:00 a. m. – 6:00 p. m.';
-        form.elements.address.placeholder = bc.address ? `Del consultorio: ${bc.address}` : 'Cra. 43A #1-50, consultorio 302';
-        paintLinks();
-        preview();
-      }
-
-      // Coordenadas desde un enlace de Google Maps (@lat,lng · q=lat,lng · !3dlat!4dlng).
-      $('mapsLink').addEventListener('input', (ev) => {
-        const v = decodeURIComponent(ev.target.value);
-        const m = v.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || v.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || v.match(/[?&](?:q|query|ll|center)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/);
-        if (!m) { if (v.trim()) App.toast(/goo\.gl|maps\.app/.test(v) ? 'Ese es un enlace corto: ábrelo y copia el enlace largo de la barra del navegador' : 'No encontramos coordenadas en ese enlace', 'warning'); return; }
-        form.elements.lat.value = m[1]; form.elements.lng.value = m[2];
-        App.toast('Ubicación tomada del enlace'); preview();
-      });
-      $('useLocation').onclick = () => {
-        if (!navigator.geolocation) return App.toast('Tu navegador no permite ubicación', 'error');
-        $('useLocation').disabled = true;
-        navigator.geolocation.getCurrentPosition((p) => {
-          form.elements.lat.value = p.coords.latitude.toFixed(6); form.elements.lng.value = p.coords.longitude.toFixed(6);
-          $('useLocation').disabled = false; App.toast('Ubicación actual tomada'); preview();
-        }, () => { $('useLocation').disabled = false; App.toast('No pudimos obtener tu ubicación', 'error'); }, { enableHighAccuracy: true, timeout: 10000 });
-      };
-
-      App.onSubmit(form, async (d) => {
-        const body = {
-          handle: d.handle,
-          card: { displayName: d.displayName, specialty: d.specialty, phone: d.phone, email: d.email, bio: d.bio,
-            hours: d.hours, address: d.address, showMap: d.showMap, lat: d.lat, lng: d.lng, links: readLinks(form) },
-        };
-        const r = await App.api('/card/me', { method: 'PUT', body });
-        mine.card = r.card; mine.handle = r.handle;
-        paintLinks();
-        App.toast('Tu tarjeta quedó guardada');
-        preview();
-        loadTeam();
-      });
-
-      App.onSubmit($('businessForm'), async (d) => {
-        await App.api('/business', { method: 'PUT', body: d });
-        App.toast('Datos guardados');
-        loadBusiness();
-      });
-
-      App.onSubmit($('teamForm'), async (d) => {
-        const r = await App.api('/team', { method: 'POST', body: d });
-        $('teamForm').reset();
-        App.toast('Miembro agregado');
-        if (r.inviteUrl) App.inviteDialog(r.inviteUrl, 'Invitación al equipo');
-        loadTeam();
-      });
-
-      $('team').addEventListener('click', async (ev) => {
-        const b = ev.target.closest('button[data-reset],button[data-remove]');
-        if (!b) return;
-        try {
-          if (b.dataset.reset) {
-            const r = await App.api(`/team/${b.dataset.reset}/invite`, { method: 'POST' });
-            App.inviteDialog(r.inviteUrl);
-            return;
-          } else {
-            if (!(await App.confirmAction('¿Quitar a esta persona del equipo?'))) return;
-            await App.api(`/team/${b.dataset.remove}`, { method: 'DELETE' });
-            App.toast('Miembro eliminado');
-          }
-          loadTeam();
-        } catch (err) { App.fail(err); }
-      });
-
       try {
-        await Promise.all([loadBusiness(), loadTeam(), loadCard()]);
+        await loadBusiness();
+        await loadTeam();
+        if (new URLSearchParams(location.search).get('tarjeta') === 'mia') editMember('me');
       } catch (err) { App.fail(err); }
     })();
   </script>

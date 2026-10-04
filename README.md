@@ -49,8 +49,11 @@ La dirección, la tarjeta y el logo **del consultorio** se administran desde **D
 | `POST /api/platform/businesses/:id/logo` (multipart `file`) · `DELETE …/logo` | logo del consultorio |
 | `GET /api/platform/businesses[/:id]` | incluye `public_url`, `admin_url`, `logo_url` y `card` |
 
-En el panel, **Ajustes → Mi tarjeta** es la tarjeta de cada profesional (`/<slug>/<handle>`): foto, nombre, especialidad,
-bio, WhatsApp, correo, horario, dirección/mapa y enlaces; lo que deje vacío se toma de la tarjeta del consultorio.
+En el panel (**Ajustes**), las tarjetas se editan *sobre la misma tarjeta* ([public/admin/assets/card-editor.js](public/admin/assets/card-editor.js)):
+
+- **Datos del negocio**: tarjeta del consultorio (logo, nombre, descripción, contacto, dirección, mapa, horario, redes). Propietario/administrador.
+- **Equipo**: cada miembro como tarjeta de contacto; el lápiz abre su tarjeta (`/<slug>/<handle>`) para editarla ahí.
+  Cada quien edita la suya; propietarios y administradores, la de cualquiera. Lo que se deje vacío se toma del negocio.
 
 ### Cuerpo Vivo
 

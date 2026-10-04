@@ -76,23 +76,27 @@ function memberFields(body) {
   };
 }
 
-// La membresía del usuario en el negocio activo; le asigna un handle si aún no tiene.
-async function myMembership(c) {
+// Membresía de un miembro del equipo ('me' = quien está en sesión); le asigna un handle si no tiene.
+// Cada quien edita su tarjeta; propietarios y administradores, la de cualquiera del equipo.
+async function membershipOf(c, who = 'me') {
+  const uid = who === 'me' ? c.user.id : who;
+  if (uid !== c.user.id && !['owner', 'admin'].includes(c.role)) throw new HttpError(403, 'Solo puedes editar tu propia tarjeta');
   const db = tenantDb(c);
   const m = await db.first(
     `SELECT m.handle, m.photo_key, m.card, m.role, u.name, u.email, b.slug
        FROM memberships m JOIN users u ON u.id = m.user_id JOIN businesses b ON b.id = m.business_id
       WHERE m.business_id = ? AND m.user_id = ?`,
-    c.businessId, c.user.id,
+    c.businessId, uid,
   );
-  if (!m) throw new HttpError(404, 'No perteneces a este consultorio');
+  if (!m) throw new HttpError(404, 'Esa persona no pertenece a este consultorio');
+  m.user_id = uid;
   if (!m.handle) {
     const base = slugify(m.name || m.email.split('@')[0]) || 'profesional';
     for (let i = 0; i < 50 && !m.handle; i++) {
       const h = (i ? `${base}-${i + 1}` : base).replace(/^-+/, '');
       if (!isValidHandle(h)) continue;
       if (await db.first('SELECT 1 FROM memberships WHERE business_id = ? AND handle = ?', c.businessId, h)) continue;
-      await db.run('UPDATE memberships SET handle = ? WHERE business_id = ? AND user_id = ?', h, c.businessId, c.user.id);
+      await db.run('UPDATE memberships SET handle = ? WHERE business_id = ? AND user_id = ?', h, c.businessId, uid);
       m.handle = h;
     }
   }
@@ -107,54 +111,96 @@ export function routes(r) {
     return json({ name: b.name, slug: b.slug, phone: b.phone, email: b.email, logo: logoUrl(b.slug, b.logo_key), card: parseCard(b.card) });
   });
 
-  // La tarjeta y el logo del consultorio se editan desde Diwilo Web (api/platform.js).
-
-  // ---------- mi tarjeta (cada profesional, cualquier rol) ----------
-
-  r.get('/api/admin/card/me', 'tenant', async (c) => {
-    const m = await myMembership(c);
-    return json({ handle: m.handle, slug: m.slug, name: m.name, email: m.email, photo: memberPhotoUrl(m.slug, m.handle, m.photo_key), card: parseCard(m.card) });
-  });
-
-  r.put('/api/admin/card/me', 'tenant', async (c) => {
+  // Tarjeta del negocio (Datos del negocio): nombre, contacto, dirección, mapa, horario y redes.
+  // Diwilo Web también puede editarla (api/platform.js); la dirección web /<slug> solo desde allá.
+  r.put('/api/admin/card', 'manager', async (c) => {
     const body = await readJson(c.req);
-    const m = await myMembership(c);
-    const card = memberFields(body.card || {});
-    let handle = m.handle;
-    if (body.handle !== undefined && body.handle !== m.handle) {
-      handle = String(body.handle || '').trim().toLowerCase();
-      if (!isValidHandle(handle)) throw new HttpError(400, 'La dirección de tu tarjeta solo puede tener minúsculas, números y guiones');
-      if (await tenantDb(c).first('SELECT 1 FROM memberships WHERE business_id = ? AND handle = ? AND user_id <> ?', c.businessId, handle, c.user.id)) {
-        throw new HttpError(409, 'Esa dirección ya la usa otra persona del equipo');
-      }
-    }
+    const card = cardFields(body.card || {});
+    const mail = str(body.email, { max: 254, label: 'Correo' });
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) throw new HttpError(400, 'El correo no es válido');
     await tenantDb(c).run(
-      'UPDATE memberships SET card = ?, handle = ? WHERE business_id = ? AND user_id = ?',
-      JSON.stringify(card), handle, c.businessId, c.user.id,
+      `UPDATE businesses SET name = ?, phone = ?, email = ?, card = ?, updated_at = datetime('now') WHERE id = ? /* business_id */`,
+      str(body.name, { required: true, max: 120, label: 'Nombre del negocio' }),
+      str(body.phone, { max: 30, label: 'Teléfono' }),
+      mail ? mail.toLowerCase() : null,
+      JSON.stringify(card), c.businessId,
     );
-    return json({ ok: true, card, handle });
+    return json({ ok: true, card });
   });
 
-  r.post('/api/admin/card/me/photo', 'tenant', async (c) => {
+  r.post('/api/admin/card/logo', 'manager', async (c) => {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get('file');
     if (!file || typeof file === 'string') throw new HttpError(400, 'Adjunta una imagen');
     if (!LOGO_TYPES.test(file.type)) throw new HttpError(415, 'La foto debe ser PNG, JPG o WebP');
     if (file.size > MAX_LOGO) throw new HttpError(413, 'La foto supera 3 MB');
-    const m = await myMembership(c);
-    const key = `${c.businessId}/team/${c.user.id}/${uuid()}`;
+    const db = tenantDb(c);
+    const prev = await db.first('SELECT slug, logo_key FROM businesses WHERE id = ? /* business_id */', c.businessId);
+    const key = `${c.businessId}/brand/${uuid()}`;
     await c.env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
-    await tenantDb(c).run('UPDATE memberships SET photo_key = ? WHERE business_id = ? AND user_id = ?', key, c.businessId, c.user.id);
-    if (m.photo_key) c.ctx.waitUntil(c.env.FILES.delete(m.photo_key));
-    return json({ ok: true, photo: memberPhotoUrl(m.slug, m.handle, key) }, 201);
+    await db.run(`UPDATE businesses SET logo_key = ?, updated_at = datetime('now') WHERE id = ? /* business_id */`, key, c.businessId);
+    if (prev.logo_key) c.ctx.waitUntil(c.env.FILES.delete(prev.logo_key));
+    return json({ ok: true, logo: logoUrl(prev.slug, key) }, 201);
   });
 
-  r.delete('/api/admin/card/me/photo', 'tenant', async (c) => {
-    const m = await myMembership(c);
-    await tenantDb(c).run('UPDATE memberships SET photo_key = NULL WHERE business_id = ? AND user_id = ?', c.businessId, c.user.id);
-    if (m.photo_key) c.ctx.waitUntil(c.env.FILES.delete(m.photo_key));
+  r.delete('/api/admin/card/logo', 'manager', async (c) => {
+    const db = tenantDb(c);
+    const prev = await db.first('SELECT logo_key FROM businesses WHERE id = ? /* business_id */', c.businessId);
+    await db.run(`UPDATE businesses SET logo_key = NULL WHERE id = ? /* business_id */`, c.businessId);
+    if (prev.logo_key) c.ctx.waitUntil(c.env.FILES.delete(prev.logo_key));
     return json({ ok: true });
   });
+
+  // ---------- tarjeta de cada miembro del equipo (/team/:userId/card, 'me' = la propia) ----------
+
+  const getMember = async (c) => {
+    const m = await membershipOf(c, c.params.userId);
+    return json({ userId: m.user_id, handle: m.handle, slug: m.slug, name: m.name, email: m.email, role: m.role,
+      photo: memberPhotoUrl(m.slug, m.handle, m.photo_key), card: parseCard(m.card) });
+  };
+  const putMember = async (c) => {
+    const body = await readJson(c.req);
+    const m = await membershipOf(c, c.params.userId);
+    const card = memberFields(body.card || {});
+    let handle = m.handle;
+    if (body.handle !== undefined && body.handle !== m.handle) {
+      handle = String(body.handle || '').trim().toLowerCase();
+      if (!isValidHandle(handle)) throw new HttpError(400, 'La dirección de la tarjeta solo puede tener minúsculas, números y guiones');
+      if (await tenantDb(c).first('SELECT 1 FROM memberships WHERE business_id = ? AND handle = ? AND user_id <> ?', c.businessId, handle, m.user_id)) {
+        throw new HttpError(409, 'Esa dirección ya la usa otra persona del equipo');
+      }
+    }
+    await tenantDb(c).run(
+      'UPDATE memberships SET card = ?, handle = ? WHERE business_id = ? AND user_id = ?',
+      JSON.stringify(card), handle, c.businessId, m.user_id,
+    );
+    return json({ ok: true, card, handle });
+  };
+  const postPhoto = async (c) => {
+    const form = await c.req.formData().catch(() => null);
+    const file = form?.get('file');
+    if (!file || typeof file === 'string') throw new HttpError(400, 'Adjunta una imagen');
+    if (!LOGO_TYPES.test(file.type)) throw new HttpError(415, 'La foto debe ser PNG, JPG o WebP');
+    if (file.size > MAX_LOGO) throw new HttpError(413, 'La foto supera 3 MB');
+    const m = await membershipOf(c, c.params.userId);
+    const key = `${c.businessId}/team/${m.user_id}/${uuid()}`;
+    await c.env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
+    await tenantDb(c).run('UPDATE memberships SET photo_key = ? WHERE business_id = ? AND user_id = ?', key, c.businessId, m.user_id);
+    if (m.photo_key) c.ctx.waitUntil(c.env.FILES.delete(m.photo_key));
+    return json({ ok: true, photo: memberPhotoUrl(m.slug, m.handle, key) }, 201);
+  };
+  const deletePhoto = async (c) => {
+    const m = await membershipOf(c, c.params.userId);
+    await tenantDb(c).run('UPDATE memberships SET photo_key = NULL WHERE business_id = ? AND user_id = ?', c.businessId, m.user_id);
+    if (m.photo_key) c.ctx.waitUntil(c.env.FILES.delete(m.photo_key));
+    return json({ ok: true });
+  };
+  for (const base of ['/api/admin/team/:userId/card', '/api/admin/card/:userId']) {
+    r.get(base, 'tenant', getMember);
+    r.put(base, 'tenant', putMember);
+    r.post(`${base}/photo`, 'tenant', postPhoto);
+    r.delete(`${base}/photo`, 'tenant', deletePhoto);
+  }
 
   // ---------- público ----------
 

@@ -4,6 +4,7 @@ import { tenantDb, globalDb, uuid } from '../lib/db.js';
 import { sendWhatsApp } from '../integrations/whatsapp.js';
 import { sendMail } from '../integrations/email.js';
 import { createInvite, invitePath } from '../lib/auth.js';
+import { parseCard, memberPhotoUrl } from './card.js';
 
 const ROLES = ['owner', 'admin', 'staff'];
 
@@ -52,13 +53,18 @@ export function routes(r) {
   // ---------- equipo ----------
 
   r.get('/api/admin/team', 'tenant', async (c) => {
-    const items = await tenantDb(c).all(
-      `SELECT u.id, u.email, u.name, m.role, m.handle, m.created_at, (u.pin_hash IS NOT NULL) AS has_password
+    const rows = await tenantDb(c).all(
+      `SELECT u.id, u.email, u.name, m.role, m.handle, m.photo_key, m.card, m.created_at, (u.pin_hash IS NOT NULL) AS has_password
          FROM memberships m JOIN users u ON u.id = m.user_id
-        WHERE m.business_id = ? ORDER BY m.role, u.email`,
+        WHERE m.business_id = ? ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.name, u.email`,
       c.businessId,
     );
-    return json({ items });
+    const slug = c.session.business_slug;
+    const items = rows.map(({ photo_key, card, ...u }) => {
+      const k = parseCard(card);
+      return { ...u, displayName: k.displayName || u.name, specialty: k.specialty || null, photo: memberPhotoUrl(slug, u.handle, photo_key), slug };
+    });
+    return json({ items, canManage: ['owner', 'admin'].includes(c.role), me: c.user.id });
   });
 
   r.post('/api/admin/team', 'manager', async (c) => {

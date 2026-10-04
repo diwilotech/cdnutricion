@@ -58,3 +58,35 @@
 .vc-org { position: relative; z-index: 1; display: inline-block; color: #DDF1F6; text-decoration: none; font-weight: 600; font-size: .9rem; margin-bottom: 8px; }
 .vc-org:hover { color: #fff; text-decoration: underline; }
 .vc-name { font-size: 1.35rem; }
+
+/* ---------- Modo edición: la misma tarjeta, con cada dato editable en su lugar ---------- */
+.vc-edit .vc-hero { padding-bottom: 20px; }
+.vc-in {
+  position: relative; z-index: 1; display: block; width: 100%; background: transparent; border: 0; outline: none; color: inherit;
+  text-align: center; font: inherit; padding: 3px 6px; border-radius: 8px; border-bottom: 1.5px dashed rgba(255,255,255,.35);
+  transition: background .2s, border-color .2s;
+}
+.vc-in:hover, .vc-in:focus { background: rgba(255,255,255,.1); border-bottom-color: rgba(255,255,255,.85); }
+.vc-in::placeholder { color: rgba(255,255,255,.62); }
+.vc-in-name { font-family: var(--cdn-display); font-weight: 800; font-size: 1.4rem; line-height: 1.2; }
+.vc-in-spec { field-sizing: content; width: auto; min-width: 60%; max-width: 100%; margin: 4px auto 8px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.16); border-radius: 999px; }
+.vc-in-bio { field-sizing: content; resize: none; color: #DDF1F6; font-size: .93rem; min-height: 4.5em; }
+.vc-in2 { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--cdn-ink); font-size: .92rem; padding: 2px 2px; border-bottom: 1.5px dashed var(--cdn-line); }
+.vc-in2:focus { border-bottom-color: var(--cdn-accent); }
+.vc-in2::placeholder { color: var(--cdn-muted); }
+.vc-row .form-check-input { margin-top: .15rem; }
+.vc-avatar-edit { cursor: pointer; }
+.vc-avatar-edit:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.vc-cam { position: absolute; left: 0; right: 0; bottom: 0; height: 32%; background: rgba(0,0,0,.45); display: grid; place-items: center; font-size: 1rem; color: #fff; transition: height .2s; }
+.vc-avatar-edit:hover .vc-cam { height: 42%; }
+.vc-photo-del { position: relative; z-index: 1; background: none; border: 0; color: #DDF1F6; font-size: .75rem; text-decoration: underline; margin: -6px 0 6px; }
+.vc-link-edit { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--cdn-line); border-radius: 12px; background: var(--cdn-surface); }
+.vc-link-edit > i { color: var(--cdn-accent); }
+.vc-link-edit [data-l=label] { flex: 0 0 34%; }
+
+/* Equipo: cada miembro como mini tarjeta de contacto */
+.team-card { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--cdn-line); border-radius: 16px; background: var(--cdn-surface); height: 100%; }
+.team-avatar { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; flex: none; display: grid; place-items: center; font-weight: 800; color: #fff; font-family: var(--cdn-display);
+  background: radial-gradient(120% 100% at 50% 20%, #1D9AB8 0%, #0F6F8C 100%); }
+.team-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.team-edit { width: 2.2rem; height: 2.2rem; border-radius: .7rem; display: grid; place-items: center; flex: none; }
