@@ -1,12 +1,13 @@
 // Ingreso con correo + contraseña -> sesión en D1 referenciada por cookie HttpOnly.
 // La sesión también fija el negocio (tenant) activo.
 // Los negocios, sus propietarios y la suscripción los maneja Diwilo Web
-// (api/platform.js, nivel 'platform' con PLATFORM_KEY).
+// (api/platform.js, nivel 'platform' por RPC).
 // La contraseña vive en users.pin_hash/pin_salt (antes era un PIN; los PIN
 // viejos se aceptan una vez y obligan a crear la contraseña).
 
 import { HttpError, getCookie } from './http.js';
 import { globalDb, nowIso } from './db.js';
+import { isPlatformCall } from './platform-rpc.js';
 
 export const SESSION_COOKIE = 'cdn_sid';
 const SESSION_HOURS = 12;
@@ -179,7 +180,7 @@ function assertWritable(c, paidUntil) {
 //   'tenant'   : + negocio activo con membresía
 //   'manager'  : + rol owner/admin en el negocio
 //   'portal'   : paciente con enlace privado
-//   'platform' : Diwilo Web (Authorization: Bearer PLATFORM_KEY)
+//   'platform' : Diwilo Web (RPC por service binding, ver platform-rpc.js)
 
 // Paciente con enlace privado: no pasa por login; el token (256 bits) es la credencial.
 async function authenticatePortal(c) {
@@ -203,12 +204,9 @@ async function authenticatePortal(c) {
   c.ctx?.waitUntil(globalDb(c.env).run(`UPDATE portal_links SET last_used_at = datetime('now') WHERE id = ?`, id));
 }
 
+// Diwilo Web entra solo por RPC (Platform.call, ver platform-rpc.js); desde internet /api/platform da 401.
 async function authenticatePlatform(c) {
-  const key = c.env.PLATFORM_KEY;
-  const auth = c.req.headers.get('authorization') || '';
-  if (!key || !timingSafeEqualHex(await sha256Hex(auth), await sha256Hex(`Bearer ${key}`))) {
-    throw new HttpError(401, 'No autorizado');
-  }
+  if (!isPlatformCall(c.req)) throw new HttpError(401, 'No autorizado');
 }
 
 export async function authenticate(c, level) {

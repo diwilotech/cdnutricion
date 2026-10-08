@@ -10,7 +10,7 @@ App web multi-tenant para consultorios de nutrición: pacientes, consultas (antr
 - **Datos:** D1 (SQLite), una sola base. Toda tabla de negocio lleva `business_id`; `tenantDb()` ([src/lib/db.js](src/lib/db.js)) rechaza SQL sin ese filtro y el valor sale siempre de la sesión.
 - **Archivos:** R2, clave `<business_id>/<patient_id>/<uuid>`.
 - **Seguridad:** correo + contraseña (PBKDF2, bloqueo tras 5 fallos) → sesión en D1 con cookie HttpOnly. Las mutaciones exigen el encabezado `x-cdn: 1` (CSRF). Sin Cloudflare Access: el único panel protegido con Access es Diwilo Web.
-- **Plataforma:** los negocios, sus propietarios y la suscripción se manejan desde **Diwilo Web** (`diwilo.com/admin`), que llama a `/api/platform/*` con `Authorization: Bearer PLATFORM_KEY` ([src/api/platform.js](src/api/platform.js)).
+- **Plataforma:** los negocios, sus propietarios y la suscripción se manejan desde **Diwilo Web** (`diwilo.com/admin`), que llama a `/api/platform/*` por RPC, sin clave compartida ([src/api/platform.js](src/api/platform.js), [src/lib/platform-rpc.js](src/lib/platform-rpc.js)).
 - **Suscripción:** `businesses.paid_until` (`YYYY-MM-DD`; vacío = sin límite). Si la fecha ya pasó, el consultorio queda en **solo lectura**: toda escritura responde 402 y el panel muestra un aviso rojo. Aplica también al portal del paciente.
 - **Integraciones:** WhatsApp vía Evolution API ([src/integrations/whatsapp.js](src/integrations/whatsapp.js)), correo vía SMTP de Gmail con sockets TCP ([src/integrations/email.js](src/integrations/email.js)).
 
@@ -90,13 +90,13 @@ Los PIN de antes siguen entrando una vez y piden crear la contraseña.
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars        # PLATFORM_KEY para probar /api/platform
+cp .dev.vars.example .dev.vars        # opcional: SMTP
 npm run db:migrate:local
 npm run db:seed:local                 # opcional: 2 negocios y 5 pacientes de ejemplo
 npm run dev                           # http://localhost:8787/admin/
 ```
 
-Para tener un usuario en local, crea un negocio con `curl -X POST localhost:8787/api/platform/businesses -H "authorization: Bearer <PLATFORM_KEY>" -d '{"name":"Prueba","owner_email":"tu@correo.com","paid_until":null}'` y abre el `invite_path` que devuelve.
+Para tener un usuario en local: Para crear negocios en local, levanta Diwilo Web junto con esta app (desde la carpeta de Diwilo: `npx wrangler dev -c wrangler.jsonc -c "../Control de Nutricion/wrangler.jsonc" --var ACCESS_AUD: --var DEV_ADMIN_EMAIL:tu@correo.com`) y usa Negocios en http://localhost:8787/admin. `/api/platform/*` solo responde por RPC.
 
 ## Despliegue (primera vez)
 
@@ -111,7 +111,6 @@ Para tener un usuario en local, crea un negocio con `curl -X POST localhost:8787
    (Zero Trust → Access → Applications). El login ahora es propio.
 3. **Secretos**
    ```bash
-   npx wrangler secret put PLATFORM_KEY         # el mismo valor que en Diwilo Web
    npx wrangler secret put SMTP_USER            # opcional: correo Gmail
    npx wrangler secret put SMTP_PASS            # opcional: contraseña de aplicación
    npx wrangler secret put EVOLUTION_URL        # opcional

@@ -1,5 +1,5 @@
 // Plataforma: Diwilo Web crea negocios, invita propietarios y fija hasta cuándo
-// está paga la suscripción. Nivel 'platform' = Authorization: Bearer PLATFORM_KEY.
+// está paga la suscripción. Nivel 'platform' = llamada RPC de Diwilo (ver lib/platform-rpc.js).
 // Contrato común a las apps de Diwilo (pedidos, nutrición, citas):
 //   GET    /api/platform/businesses
 //   POST   /api/platform/businesses                 { name, slug?, owner_email, owner_name?, paid_until }
@@ -11,8 +11,8 @@
 //   DELETE /api/platform/businesses/:id/logo
 //   POST   /api/platform/businesses/:id/users       { email, name?, role: owner|admin|staff } -> invite_path
 //          Un solo propietario por negocio: role 'owner' le pasa la propiedad (el anterior queda como administrador).
+//   PATCH  /api/platform/businesses/:id/users/:userId { role }  solo cambia permisos (no genera link ni toca la contraseña)
 //   DELETE /api/platform/businesses/:id/users/:userId   (el propietario no se quita: primero se pasa la propiedad)
-//   DELETE /api/platform/businesses/:id/users/:userId
 import { json, readJson, HttpError, str, oneOf, email } from '../lib/http.js';
 import { globalDb, uuid } from '../lib/db.js';
 import { createInvite, invitePath, isExpired } from '../lib/auth.js';
@@ -183,6 +183,26 @@ export function routes(r) {
       oneOf(body.role, ['owner', 'admin', 'staff'], { label: 'Rol', fallback: 'staff' }),
     );
     return json(member, 201);
+  });
+
+  // Cambia solo el rol (permisos) de un miembro, sin generar link nuevo ni tocar su contraseña.
+  // role 'owner' le pasa la propiedad: el propietario anterior queda como administrador.
+  r.patch('/api/platform/businesses/:id/users/:userId', 'platform', async (c) => {
+    const body = await readJson(c.req);
+    const role = oneOf(body.role, ['owner', 'admin', 'staff'], { label: 'Rol' });
+    if (!role) throw new HttpError(400, 'Rol es obligatorio');
+    const db = globalDb(c.env);
+    const m = await db.first('SELECT role FROM memberships WHERE business_id = ? AND user_id = ?', c.params.id, c.params.userId);
+    if (!m) throw new HttpError(404, 'El usuario no pertenece a este negocio');
+    if (m.role === role) return json({ ok: true, role });
+    if (m.role === 'owner') throw new HttpError(409, 'Es el propietario: para cambiarlo, asigna otro propietario');
+    await db.batch([
+      ...(role === 'owner'
+        ? [db.prepare(`UPDATE memberships SET role = 'admin' WHERE business_id = ? AND role = 'owner'`, c.params.id)]
+        : []),
+      db.prepare('UPDATE memberships SET role = ? WHERE business_id = ? AND user_id = ?', role, c.params.id, c.params.userId),
+    ]);
+    return json({ ok: true, role });
   });
 
   r.delete('/api/platform/businesses/:id/users/:userId', 'platform', async (c) => {
