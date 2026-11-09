@@ -102,13 +102,13 @@ const DEMO = [
 
 export function routes(r) {
   // Índices de los ejemplos que faltan en este consultorio.
-  r.get('/api/admin/demo', 'manager', async (c) => {
+  r.get('/api/admin/demo', 'manager:ajustes', async (c) => {
     const have = new Set((await tenantDb(c).all(`SELECT doc_id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%'`, c.businessId)).map((x) => x.doc_id));
     return json({ total: DEMO.length, missing: DEMO.map((_, i) => i).filter((i) => !have.has(`DEMO-${i + 1}`)) });
   });
 
   // Crea UN paciente de ejemplo por petición: así no se supera el límite de consultas a D1 por invocación.
-  r.post('/api/admin/demo', 'manager', async (c) => {
+  r.post('/api/admin/demo', 'manager:ajustes', async (c) => {
     const { index } = await readJson(c.req);
     const i = Number(index), d = DEMO[i];
     if (!Number.isInteger(i) || !d) throw new HttpError(400, 'Ejemplo inválido');
@@ -166,7 +166,7 @@ export function routes(r) {
   });
 
   // Borra los pacientes de ejemplo con todo lo suyo.
-  r.delete('/api/admin/demo', 'manager', async (c) => {
+  r.delete('/api/admin/demo', 'manager:ajustes', async (c) => {
     const db = tenantDb(c);
     const bid = c.businessId;
     const sub = `(SELECT id FROM patients WHERE business_id = ? AND doc_id LIKE 'DEMO-%')`;

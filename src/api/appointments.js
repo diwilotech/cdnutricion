@@ -27,7 +27,7 @@ function fmtWhen(startsAt) {
 }
 
 export function routes(r) {
-  r.get('/api/admin/appointments', 'tenant', async (c) => {
+  r.get('/api/admin/appointments', 'tenant:citas', async (c) => {
     const today = localNow(c.timezone).date;
     const from = date(c.url.searchParams.get('from')) || today;
     const to = date(c.url.searchParams.get('to')) || addDays(from, 7);
@@ -41,7 +41,7 @@ export function routes(r) {
     return json({ from, to, items });
   });
 
-  r.post('/api/admin/appointments', 'tenant', async (c) => {
+  r.post('/api/admin/appointments', 'tenant:citas', async (c) => {
     const db = tenantDb(c);
     const f = apptFields(await readJson(c.req));
     await getPatient(db, c.businessId, f.patient_id);
@@ -54,7 +54,7 @@ export function routes(r) {
     return json({ id }, 201);
   });
 
-  r.put('/api/admin/appointments/:id', 'tenant', async (c) => {
+  r.put('/api/admin/appointments/:id', 'tenant:citas', async (c) => {
     const db = tenantDb(c);
     const f = apptFields(await readJson(c.req));
     await getPatient(db, c.businessId, f.patient_id);
@@ -67,14 +67,14 @@ export function routes(r) {
     return json({ ok: true });
   });
 
-  r.delete('/api/admin/appointments/:id', 'tenant', async (c) => {
+  r.delete('/api/admin/appointments/:id', 'tenant:citas', async (c) => {
     const res = await tenantDb(c).run('DELETE FROM appointments WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!res.meta.changes) throw new HttpError(404, 'Cita no encontrada');
     return json({ ok: true });
   });
 
   // Recordatorio por WhatsApp (Evolution API).
-  r.post('/api/admin/appointments/:id/remind', 'tenant', async (c) => {
+  r.post('/api/admin/appointments/:id/remind', 'tenant:citas', async (c) => {
     const db = tenantDb(c);
     const a = await db.first(
       `SELECT a.starts_at, a.kind, p.first_name, p.phone, b.name AS business_name, b.wa_instance

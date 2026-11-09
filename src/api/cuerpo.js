@@ -136,13 +136,13 @@ async function saveLog(c, patientId, day, data) {
 export function routes(r) {
   // ---------- nutricionista ----------
 
-  r.get('/api/admin/patients/:id/cuerpo', 'tenant', async (c) => {
+  r.get('/api/admin/patients/:id/cuerpo', 'tenant:pacientes', async (c) => {
     const data = await loadCuerpo(c, c.params.id);
     const portal = await activePortal(c, c.params.id);
     return json({ ...data, portal, user: { name: c.user.name, email: c.user.email } });
   });
 
-  r.put('/api/admin/patients/:id/profile', 'tenant', async (c) => {
+  r.put('/api/admin/patients/:id/profile', 'tenant:pacientes', async (c) => {
     await getPatient(tenantDb(c), c.businessId, c.params.id);
     const body = await readJson(c.req);
     await saveProfile(c, c.params.id, {
@@ -153,13 +153,13 @@ export function routes(r) {
     return json({ ok: true });
   });
 
-  r.put('/api/admin/patients/:id/log/:day', 'tenant', async (c) => {
+  r.put('/api/admin/patients/:id/log/:day', 'tenant:pacientes', async (c) => {
     await getPatient(tenantDb(c), c.businessId, c.params.id);
     await saveLog(c, c.params.id, c.params.day, (await readJson(c.req)).data);
     return json({ ok: true });
   });
 
-  r.post('/api/admin/patients/:id/labs', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/labs', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const body = await readJson(c.req);
@@ -177,13 +177,13 @@ export function routes(r) {
     return json({ id }, 201);
   });
 
-  r.delete('/api/admin/labs/:id', 'tenant', async (c) => {
+  r.delete('/api/admin/labs/:id', 'tenant:pacientes', async (c) => {
     const res = await tenantDb(c).run('DELETE FROM patient_labs WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!res.meta.changes) throw new HttpError(404, 'Examen no encontrado');
     return json({ ok: true });
   });
 
-  r.post('/api/admin/patients/:id/recs', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/recs', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const text = str((await readJson(c.req)).text, { required: true, max: 2000, label: 'Recomendación' });
@@ -195,19 +195,19 @@ export function routes(r) {
     return json({ id }, 201);
   });
 
-  r.delete('/api/admin/recs/:id', 'tenant', async (c) => {
+  r.delete('/api/admin/recs/:id', 'tenant:pacientes', async (c) => {
     const res = await tenantDb(c).run('DELETE FROM recommendations WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!res.meta.changes) throw new HttpError(404, 'Recomendación no encontrada');
     return json({ ok: true });
   });
 
   // Enlace privado del paciente: se crea uno nuevo (el anterior deja de funcionar).
-  r.post('/api/admin/patients/:id/portal', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/portal', 'tenant:pacientes', async (c) => {
     await getPatient(tenantDb(c), c.businessId, c.params.id);
     return json({ url: await createPortal(c, c.params.id) }, 201);
   });
 
-  r.delete('/api/admin/patients/:id/portal', 'tenant', async (c) => {
+  r.delete('/api/admin/patients/:id/portal', 'tenant:pacientes', async (c) => {
     await tenantDb(c).run(
       `UPDATE portal_links SET revoked_at = datetime('now') WHERE business_id = ? AND patient_id = ? AND revoked_at IS NULL`,
       c.businessId, c.params.id,
@@ -221,7 +221,7 @@ export function routes(r) {
   //  - Cita de hoy o futura: se actualiza con el plan vigente (reimprimir tras editar trae lo último).
   //  - Cita pasada: queda fija; si nunca se imprimió, toma el último plan entregado hasta ese día.
   //  - Sin cita: si nada cambió desde la última entrega, se reusa esa.
-  r.post('/api/admin/patients/:id/plans', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/plans', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const bid = c.businessId, pid = c.params.id;
     await getPatient(db, bid, pid);
@@ -284,7 +284,7 @@ export function routes(r) {
   });
 
   // Todo lo que lleva la hoja: plan entregado, cómo va (medidas y exámenes hasta ese día), consultorio, quién lo entrega y QR.
-  r.get('/api/admin/plans/:planId', 'tenant', async (c) => {
+  r.get('/api/admin/plans/:planId', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const bid = c.businessId;
     const row = await db.first(
@@ -361,7 +361,7 @@ export function routes(r) {
   });
 
   // Informes ya generados por cita (para marcar en la ficha cuáles tienen PDF).
-  r.get('/api/admin/patients/:id/plans', 'tenant', async (c) => {
+  r.get('/api/admin/patients/:id/plans', 'tenant:pacientes', async (c) => {
     const rows = await tenantDb(c).all(
       'SELECT id, appointment_id FROM patient_plans WHERE business_id = ? AND patient_id = ? AND appointment_id IS NOT NULL',
       c.businessId, c.params.id,

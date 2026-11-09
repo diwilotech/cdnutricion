@@ -1,0 +1,36 @@
+/* Componentes propios de las páginas de Nutrición, sobre el tema común (diwilo.css). Los colores salen del tema y del modo del negocio. */
+:root, [data-bs-theme="dark"] {
+  --cdn-accent: var(--dw-p);
+  --cdn-accent-dark: var(--dw-p);
+  --cdn-accent-soft: rgba(var(--dw-p-rgb), .14);
+  --cdn-stage: var(--dw-p);
+  --cdn-bg: var(--dw-fondo);
+  --cdn-surface: var(--dw-tarjeta);
+  --cdn-surface-2: var(--bs-tertiary-bg);
+  --cdn-line: var(--dw-borde);
+  --cdn-ink: var(--bs-body-color);
+  --cdn-muted: var(--bs-secondary-color);
+  --cdn-display: inherit;
+}
+.page-title { font-size: 1.45rem; font-weight: 800; margin: 0; }
+.kpi { padding: 1rem 1.1rem; }
+.kpi .kpi-label { font-size: .75rem; color: var(--cdn-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.kpi .kpi-value { font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi .kpi-icon { font-size: 1.3rem; color: var(--cdn-accent); background: var(--cdn-accent-soft); width: 2.2rem; height: 2.2rem; border-radius: .7rem; display: grid; place-items: center; }
+.avatar {
+  width: 2.25rem; height: 2.25rem; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--cdn-accent-soft); color: var(--cdn-accent); font-weight: 700; font-size: .85rem;
+}
+.table td, .table th { vertical-align: middle; }
+.table thead th { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--cdn-muted); font-weight: 600; }
+.table-clickable tbody tr { cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; text-align: end; }
+.empty { padding: 2rem 1rem; text-align: center; color: var(--bs-secondary-color); }
+.appt-time { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3.5rem; font-family: ui-monospace, 'DM Mono', monospace; }
+#toasts { z-index: 1090; }
+@media (max-width: 991.98px) { #toasts { bottom: 70px !important; } }
+@media (max-width: 575.98px) {
+  .kpi .kpi-value { font-size: 1.5rem; }
+  .hide-xs { display: none; }
+}
