@@ -25,6 +25,9 @@ export function globalDb(env) {
   return wrap(env.DB, null);
 }
 
+// Alias que usan los archivos comunes de las apps de Diwilo (me, settings, mcp, plataforma de módulos…)
+export const db = globalDb;
+
 export function tenantDb(c) {
   if (!c.businessId) throw new Error('tenantDb sin businessId');
   return wrap(c.env.DB, (sql) => {

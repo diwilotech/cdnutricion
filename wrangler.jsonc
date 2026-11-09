@@ -25,7 +25,10 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/admin", "/admin/*"]
+    "not_found_handling": "404-page",
+    // Pasan por el Worker: login y panel (/<dirección>/admin), páginas /staff (exigen sesión), API, tarjetas públicas y MCP.
+    // Los archivos estáticos (css, js, íconos…) se sirven directo.
+    "run_worker_first": ["/*", "!/css/*", "!/js/*", "!/icons/*", "!/cv/*", "!/p/*", "!/admin/assets/*", "!/favicon.svg", "!/manifest.json", "!/sw.js", "!/404.html"]
   },
 
   "d1_databases": [
@@ -40,6 +43,15 @@
   "r2_buckets": [
     { "binding": "FILES", "bucket_name": "cdnutricion-files" }
   ],
+
+  // Tareas diarias de los módulos (3:00 a. m. Colombia).
+  "triggers": { "crons": ["0 8 * * *"] },
+
+  // Módulos horizontales (Inicio, Marca, IA, Finanzas, Marketing, Nómina, Mensajes): Worker central «Diwilo Modulos» por RPC (modulos.app.json → "centrales").
+  "services": [{ "binding": "MODULOS", "service": "diwilo-modulos", "entrypoint": "Modulos" }],
+
+  // Asistente de IA (Workers AI) para los módulos centrales.
+  "ai": { "binding": "AI" },
 
   "vars": {
     "APP_NAME": "CD Nutrición",

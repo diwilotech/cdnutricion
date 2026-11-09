@@ -48,7 +48,7 @@ export async function getPatient(db, bid, id) {
 }
 
 export function routes(r) {
-  r.get('/api/admin/patients', 'tenant', async (c) => {
+  r.get('/api/admin/patients', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const q = (c.url.searchParams.get('q') || '').trim();
     const status = c.url.searchParams.get('status') === 'archived' ? 'archived' : 'active';
@@ -74,7 +74,7 @@ export function routes(r) {
     return json({ items: rows.results, total: total.results[0].n, page, pageSize: PAGE_SIZE });
   });
 
-  r.post('/api/admin/patients', 'tenant', async (c) => {
+  r.post('/api/admin/patients', 'tenant:pacientes', async (c) => {
     const f = patientFields(await readJson(c.req));
     const id = uuid();
     await tenantDb(c).run(
@@ -85,7 +85,7 @@ export function routes(r) {
     return json({ id }, 201);
   });
 
-  r.get('/api/admin/patients/:id', 'tenant', async (c) => {
+  r.get('/api/admin/patients/:id', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const patient = await getPatient(db, c.businessId, c.params.id);
     const [consultations, appointments, files] = await db.batch([
@@ -113,7 +113,7 @@ export function routes(r) {
     });
   });
 
-  r.put('/api/admin/patients/:id', 'tenant', async (c) => {
+  r.put('/api/admin/patients/:id', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const body = await readJson(c.req);
     await getPatient(db, c.businessId, c.params.id);
@@ -130,7 +130,7 @@ export function routes(r) {
   });
 
   // Borrado definitivo (incluye consultas, citas y archivos) — solo owner/admin.
-  r.delete('/api/admin/patients/:id', 'manager', async (c) => {
+  r.delete('/api/admin/patients/:id', 'manager:pacientes', async (c) => {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const files = await db.all('SELECT r2_key FROM files WHERE business_id = ? AND patient_id = ?', c.businessId, c.params.id);
@@ -146,7 +146,7 @@ export function routes(r) {
 
   // ---------- consultas (mediciones) ----------
 
-  r.post('/api/admin/patients/:id/consultations', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/consultations', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const body = await readJson(c.req);
@@ -164,7 +164,7 @@ export function routes(r) {
     return json({ id }, 201);
   });
 
-  r.put('/api/admin/consultations/:id', 'tenant', async (c) => {
+  r.put('/api/admin/consultations/:id', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const current = await db.first('SELECT patient_id FROM consultations WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!current) throw new HttpError(404, 'Consulta no encontrada');
@@ -181,7 +181,7 @@ export function routes(r) {
     return json({ ok: true });
   });
 
-  r.delete('/api/admin/consultations/:id', 'tenant', async (c) => {
+  r.delete('/api/admin/consultations/:id', 'tenant:pacientes', async (c) => {
     const res = await tenantDb(c).run('DELETE FROM consultations WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!res.meta.changes) throw new HttpError(404, 'Consulta no encontrada');
     return json({ ok: true });

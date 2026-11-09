@@ -104,7 +104,7 @@ async function membershipOf(c, who = 'me') {
 }
 
 export function routes(r) {
-  r.get('/api/admin/card', 'tenant', async (c) => {
+  r.get('/api/admin/card', 'tenant:ajustes', async (c) => {
     const b = await tenantDb(c).first(
       'SELECT name, slug, phone, email, logo_key, card FROM businesses WHERE id = ? /* business_id */', c.businessId,
     );
@@ -113,7 +113,7 @@ export function routes(r) {
 
   // Tarjeta del negocio (Datos del negocio): nombre, contacto, dirección, mapa, horario y redes.
   // Diwilo Web también puede editarla (api/platform.js); la dirección web /<slug> solo desde allá.
-  r.put('/api/admin/card', 'manager', async (c) => {
+  r.put('/api/admin/card', 'manager:ajustes', async (c) => {
     const body = await readJson(c.req);
     const card = cardFields(body.card || {});
     const mail = str(body.email, { max: 254, label: 'Correo' });
@@ -128,7 +128,7 @@ export function routes(r) {
     return json({ ok: true, card });
   });
 
-  r.post('/api/admin/card/logo', 'manager', async (c) => {
+  r.post('/api/admin/card/logo', 'manager:ajustes', async (c) => {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get('file');
     if (!file || typeof file === 'string') throw new HttpError(400, 'Adjunta una imagen');
@@ -143,7 +143,7 @@ export function routes(r) {
     return json({ ok: true, logo: logoUrl(prev.slug, key) }, 201);
   });
 
-  r.delete('/api/admin/card/logo', 'manager', async (c) => {
+  r.delete('/api/admin/card/logo', 'manager:ajustes', async (c) => {
     const db = tenantDb(c);
     const prev = await db.first('SELECT logo_key FROM businesses WHERE id = ? /* business_id */', c.businessId);
     await db.run(`UPDATE businesses SET logo_key = NULL WHERE id = ? /* business_id */`, c.businessId);
@@ -196,10 +196,10 @@ export function routes(r) {
     return json({ ok: true });
   };
   for (const base of ['/api/admin/team/:userId/card', '/api/admin/card/:userId']) {
-    r.get(base, 'tenant', getMember);
-    r.put(base, 'tenant', putMember);
-    r.post(`${base}/photo`, 'tenant', postPhoto);
-    r.delete(`${base}/photo`, 'tenant', deletePhoto);
+    r.get(base, 'tenant:ajustes', getMember);
+    r.put(base, 'tenant:ajustes', putMember);
+    r.post(`${base}/photo`, 'tenant:ajustes', postPhoto);
+    r.delete(`${base}/photo`, 'tenant:ajustes', deletePhoto);
   }
 
   // ---------- público ----------

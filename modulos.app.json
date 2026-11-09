@@ -1,0 +1,102 @@
+{
+  "app": "cdnutricion",
+  "nombre": "CD Nutrición",
+  "tema": "turquesa",
+  "centrales": [
+    "finanzas",
+    "marketing",
+    "nomina",
+    "whatsapp",
+    "marca",
+    "ai",
+    "dashboard"
+  ],
+  "modulos": [
+    {
+      "id": "pacientes",
+      "nombre": "Pacientes",
+      "icono": "bi-people",
+      "menu": {
+        "ruta": "/staff/pacientes.html",
+        "orden": 10
+      },
+      "permisos": {
+        "ver": "staff",
+        "configurar": "admin"
+      },
+      "widgets": [],
+      "depende_de": [],
+      "tipo": "propio",
+      "tablas": [
+        "patients",
+        "consultations",
+        "patient_profiles",
+        "patient_labs",
+        "recommendations",
+        "patient_logs",
+        "patient_plans",
+        "portal_links",
+        "files"
+      ],
+      "mcp": {
+        "guia": "Pacientes: la ficha de cada paciente con sus datos, objetivo, consultas (peso, grasa, músculo, medidas), laboratorios, recomendaciones, planes entregados, archivos y el enlace privado de seguimiento (Cuerpo Vivo). La IA busca pacientes, consulta su evolución y registra consultas; crear o borrar pide confirmación.",
+        "ejemplos": [
+          "Pídele: «¿Qué pacientes llevan más de 60 días sin volver?»",
+          "Pídele: «Resume la evolución de peso de María en los últimos 3 meses»"
+        ],
+        "flujos": []
+      }
+    },
+    {
+      "id": "citas",
+      "nombre": "Agenda",
+      "icono": "bi-calendar-week",
+      "menu": {
+        "ruta": "/staff/citas.html",
+        "orden": 20
+      },
+      "permisos": {
+        "ver": "staff",
+        "configurar": "admin"
+      },
+      "widgets": [],
+      "depende_de": [],
+      "tipo": "propio",
+      "tablas": [
+        "appointments"
+      ],
+      "mcp": {
+        "guia": "Agenda: citas de los pacientes (primera vez, control, virtual) con su estado (programada, atendida, cancelada, no asistió) y recordatorios por WhatsApp. La IA consulta la agenda y agenda o cambia el estado de una cita.",
+        "ejemplos": [
+          "Pídele: «¿Qué citas tengo mañana?»",
+          "Pídele: «Agenda un control para Juan el viernes a las 3 pm»"
+        ],
+        "flujos": []
+      }
+    },
+    {
+      "id": "ajustes",
+      "nombre": "Consultorio",
+      "icono": "bi-gear",
+      "menu": {
+        "ruta": "/staff/ajustes.html",
+        "orden": 80
+      },
+      "permisos": {
+        "ver": "staff",
+        "configurar": "admin"
+      },
+      "widgets": [],
+      "depende_de": [],
+      "tipo": "propio",
+      "tablas": [
+        "business_slug_aliases"
+      ],
+      "mcp": {
+        "guia": "Consultorio: datos del consultorio, tarjeta digital pública y la de cada profesional, integraciones (WhatsApp y correo) y pacientes de ejemplo. La IA consulta estos datos; los cambios los hace el propietario o un administrador.",
+        "ejemplos": [],
+        "flujos": []
+      }
+    }
+  ]
+}

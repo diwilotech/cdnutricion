@@ -9,6 +9,7 @@ import { globalDb } from './db.js';
 export const RESERVED = new Set([
   'admin', 'api', 'p', 'cv', 'assets', 'login', 'logout', 'static', 'www', 'app', 'negocio',
   'favicon.ico', 'robots.txt', 'cdn-cgi', 'platform', 'public', 'diwilo',
+  'staff', 'mcp', 'm', 'l', 'c', 'chat', 'v1', 'wa', 'validar', 'css', 'js', 'icons', 'manifest.json', 'sw.js', 'privacidad', 'dmca',
 ]);
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 

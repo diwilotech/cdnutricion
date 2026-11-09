@@ -1,0 +1,20 @@
+{
+  "name": "CD Nutrición",
+  "short_name": "Nutrición",
+  "description": "Consultorio de nutrición: pacientes, consultas, agenda y seguimiento Cuerpo Vivo.",
+  "lang": "es-CO",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0f766e",
+  "background_color": "#f5f6fa",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

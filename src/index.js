@@ -2,10 +2,14 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { platformCall } from './lib/platform-rpc.js';
 import { Router } from './router.js';
-import { HttpError, errorResponse } from './lib/http.js';
+import { HttpError, errorResponse, json } from './lib/http.js';
 import { authenticate, loadSession } from './lib/auth.js';
 import { slugFromPath, businessBySlug, defaultSlug, isMember } from './lib/tenant.js';
 import * as authApi from './api/auth.js';
+import * as platformModulesApi from './api/platform-modules.js';
+import * as meApi from './api/me.js';
+import * as settingsApi from './api/settings.js';
+import * as mcpApi from './api/mcp.js';
 import * as dashboardApi from './api/dashboard.js';
 import * as patientsApi from './api/patients.js';
 import * as appointmentsApi from './api/appointments.js';
@@ -17,14 +21,17 @@ import * as demoApi from './api/demo.js';
 import * as publicApi from './api/public.js';
 import * as cardApi from './api/card.js';
 import { parseCard, logoUrl, isValidHandle, memberCardData } from './api/card.js';
+import { isCentralApi, centralModuleOf, centralApi, centralPage, centralAsset, centralPublic } from './lib/central.js';
+import { CENTRALES } from './lib/modules.js';
 
 const router = new Router();
-for (const mod of [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, platformApi, cuerpoApi, demoApi, publicApi, cardApi]) {
-  mod.routes(router);
-}
+// platform y platform-modules primero. Los horizontales (Inicio, Marca, IA, Finanzas, Marketing, Nómina, Mensajes) no van aquí:
+// se piden en modulos.app.json → "centrales" y viven en Diwilo Modulos.
+const MODULE_APIS = [authApi, dashboardApi, patientsApi, appointmentsApi, filesApi, businessApi, cuerpoApi, demoApi, publicApi, cardApi];
+for (const mod of [platformApi, platformModulesApi, meApi, settingsApi, mcpApi, ...MODULE_APIS]) mod.routes(router);
 
 const SECURITY_HEADERS = {
-  'x-frame-options': 'DENY',
+  'x-frame-options': 'SAMEORIGIN',   // el panel carga las páginas de los módulos en un marco del mismo sitio
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'same-origin',
 };
@@ -33,13 +40,27 @@ async function handleApi(req, env, ctx, url) {
   const { route, params } = router.match(req.method, url.pathname);
   // Protección CSRF: toda mutación debe traer este encabezado (fuerza preflight entre orígenes).
   // Diwilo Web (nivel 'platform') no usa cookies: entra por RPC (Platform.call).
-  if (req.method !== 'GET' && route.auth !== 'platform' && req.headers.get('x-cdn') !== '1') {
+  if (req.method !== 'GET' && route.auth !== 'platform' && req.headers.get('x-cdn') !== '1' && req.headers.get('x-app') !== '1') {
     throw new HttpError(403, 'Solicitud no permitida');
   }
   const c = { req, env, ctx, url, params };
   await authenticate(c, route.auth);
   return route.handler(c);
 }
+
+// Módulos centrales: la app verifica sesión, negocio, rol, módulo activo y CSRF; Diwilo Modulos hace el resto.
+async function handleCentral(req, env, ctx, url) {
+  if (req.method !== 'GET' && req.headers.get('x-app') !== '1') throw new HttpError(403, 'Solicitud no permitida');
+  const c = { req, env, ctx, url, params: {} };
+  await authenticate(c, `tenant:${centralModuleOf(url.pathname)}`);
+  // Guía de uso del módulo para el MCP (se arma aquí con su manifiesto y las herramientas del rol)
+  if (req.method === 'GET' && /^\/api\/[a-z]+\/mcp$/.test(url.pathname)) return json(await mcpApi.guiaDeModulo(c, centralModuleOf(url.pathname), url.origin));
+  return centralApi(c);
+}
+
+// Páginas viejas del panel (/<slug>/admin/<sección>) → página del módulo dentro del panel
+const PAGINA = { '': '/staff/', pacientes: '/staff/pacientes.html', cuerpo: '/staff/cuerpo.html', paciente: '/staff/pacientes.html', plan: '/staff/plan.html', citas: '/staff/citas.html', ajustes: '/staff/ajustes.html' };
+const aPanel = (url, slug, go) => Response.redirect(`${url.origin}/${slug}/admin/${go ? `?go=${encodeURIComponent(go)}` : ''}`, 302);
 
 const assetAt = (env, req, path) => {
   const u = new URL(req.url);
@@ -158,10 +179,18 @@ async function handleBusinessPath(req, env, url, slug) {
   if (rest === '/admin' || rest.startsWith('/admin/')) {
     if (rest.startsWith('/admin/assets/')) return assetAt(env, req, rest);
     const page = rest.replace(/\.html$/, '').replace(/\/$/, '');
-    if (page !== '/admin/login' && !(await loadSession(req, env))) {
-      return Response.redirect(`${url.origin}/${slug}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
+    const s = await loadSession(req, env);
+    if (page === '/admin/login') return keepPrefix(await assetAt(env, req, rest), `/${slug}`, url);
+    if (!s) return Response.redirect(`${url.origin}/${slug}/admin/login?next=${encodeURIComponent(url.pathname + url.search)}`, 302);
+    // Panel: una sola página con el menú común; cada módulo se carga en un marco. Las direcciones viejas llevan a su módulo.
+    if (page === '/admin') {
+      if (!(await isMember(env, s.user_id, slug))) throw new HttpError(403, 'No tienes acceso a este consultorio.');
+      // El panel va con el consultorio de la dirección: si la sesión estaba en otro, se cambia (es miembro de ambos)
+      if (s.business_slug !== slug) await env.DB.prepare('UPDATE sessions SET business_id = ? WHERE id = ?').bind(business.id, s.session_id).run();
+      return withHeaders(await assetAt(env, req, '/staff/panel'), { 'cache-control': 'no-store' });
     }
-    return keepPrefix(await assetAt(env, req, rest), `/${slug}`, url);
+    const sec = page.replace(/^\/admin\//, '');
+    return aPanel(url, slug, PAGINA[sec] ? `${PAGINA[sec]}${url.search}` : null);
   }
   // Tarjeta de un profesional: /<slug>/<handle>[/manifest.webmanifest | /sw.js]
   const [, handle, extra = ''] = rest.split('/');
@@ -214,7 +243,25 @@ const worker = {
     const url = new URL(req.url);
     const isApi = url.pathname.startsWith('/api/');
     try {
+      if (isApi && isCentralApi(url.pathname)) return withHeaders(await handleCentral(req, env, ctx, url), SECURITY_HEADERS);
       if (isApi) return withHeaders(await handleApi(req, env, ctx, url), SECURITY_HEADERS);
+      if (url.pathname === '/mcp') return withHeaders(await mcpApi.mcpFetch(req, env, ctx), SECURITY_HEADERS);
+      // Chats de clientes, API pública, WhatsApp, links de rastreo, validación de documentos y tarjetas de Marketing (Diwilo Modulos)
+      if (url.pathname.startsWith('/chat/') || url.pathname.startsWith('/v1/') || url.pathname.startsWith('/wa/')) return withHeaders(await centralPublic(env, url, req), { 'x-content-type-options': 'nosniff' });
+      if (url.pathname.startsWith('/l/') || url.pathname.startsWith('/validar/') || url.pathname.startsWith('/c/')) return withHeaders(await centralPublic(env, url, req), SECURITY_HEADERS);
+      // Código de las páginas de los módulos centrales
+      if (url.pathname.startsWith('/m/')) return withHeaders(await centralAsset(env, url.pathname), SECURITY_HEADERS);
+      // Páginas de los módulos (/staff/…): las carga el panel dentro de un marco; abiertas directo llevan al panel.
+      if (url.pathname === '/staff' || url.pathname.startsWith('/staff/')) {
+        const s = await loadSession(req, env);
+        if (!s?.business_id || !s.role) return Response.redirect(`${url.origin}/`, 302);
+        if (req.method === 'GET' && req.headers.get('sec-fetch-dest') === 'document' && !url.pathname.startsWith('/staff/panel') && (/^\/staff\/?$/.test(url.pathname) || url.pathname.endsWith('.html'))) {
+          return aPanel(url, s.business_slug, url.pathname + url.search);
+        }
+        const central = CENTRALES.find((id) => url.pathname === `/staff/${id}.html` || url.pathname === `/staff/${id}`);
+        if (central) return withHeaders(await centralPage(env, req, central), SECURITY_HEADERS);
+        return withHeaders(await env.ASSETS.fetch(req), { ...SECURITY_HEADERS, 'cache-control': 'no-store' });
+      }
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
         return withHeaders(await handleLegacyAdmin(req, env, url), SECURITY_HEADERS);
       }
@@ -244,6 +291,14 @@ const worker = {
     }
   },
 };
+// Tareas diarias de los módulos propios (cron de wrangler.jsonc): cada módulo puede exportar daily(env).
+worker.scheduled = async (event, env, ctx) => {
+  for (const mod of MODULE_APIS) {
+    if (typeof mod.daily !== 'function') continue;
+    ctx.waitUntil(mod.daily(env).catch((e) => console.error('tarea diaria', e.message)));
+  }
+};
+
 export default worker;
 
 // Diwilo Web administra esta app por RPC (service binding con entrypoint "Platform"), sin clave compartida.

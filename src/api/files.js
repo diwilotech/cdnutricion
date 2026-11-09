@@ -7,7 +7,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 const ALLOWED = /^(image\/(jpeg|png|webp|heic|heif|gif)|application\/pdf)$/;
 
 export function routes(r) {
-  r.post('/api/admin/patients/:id/files', 'tenant', async (c) => {
+  r.post('/api/admin/patients/:id/files', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     await getPatient(db, c.businessId, c.params.id);
     const form = await c.req.formData().catch(() => null);
@@ -31,7 +31,7 @@ export function routes(r) {
     return json({ id, name }, 201);
   });
 
-  r.get('/api/admin/files/:id', 'tenant', async (c) => {
+  r.get('/api/admin/files/:id', 'tenant:pacientes', async (c) => {
     const f = await tenantDb(c).first('SELECT * FROM files WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!f) throw new HttpError(404, 'Archivo no encontrado');
     const obj = await c.env.FILES.get(f.r2_key);
@@ -47,7 +47,7 @@ export function routes(r) {
     });
   });
 
-  r.delete('/api/admin/files/:id', 'tenant', async (c) => {
+  r.delete('/api/admin/files/:id', 'tenant:pacientes', async (c) => {
     const db = tenantDb(c);
     const f = await db.first('SELECT r2_key FROM files WHERE business_id = ? AND id = ?', c.businessId, c.params.id);
     if (!f) throw new HttpError(404, 'Archivo no encontrado');

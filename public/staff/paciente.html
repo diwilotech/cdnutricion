@@ -6,7 +6,7 @@
   <script>
     // La ficha (datos, citas, consultas y archivos) ahora vive dentro de Cuerpo Vivo.
     const id = new URLSearchParams(location.search).get('id');
-    location.replace(id ? `/admin/cuerpo?id=${encodeURIComponent(id)}&tab=ficha` : '/admin/pacientes');
+    location.replace(id ? `/staff/cuerpo.html?id=${encodeURIComponent(id)}&tab=ficha` : '/staff/pacientes.html');
   </script>
 </head>
 <body></body>

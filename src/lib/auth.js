@@ -5,6 +5,7 @@
 // La contraseña vive en users.pin_hash/pin_salt (antes era un PIN; los PIN
 // viejos se aceptan una vez y obligan a crear la contraseña).
 
+import { parseModulos, requireModule } from './modules.js';
 import { HttpError, getCookie } from './http.js';
 import { globalDb, nowIso } from './db.js';
 import { isPlatformCall } from './platform-rpc.js';
@@ -27,7 +28,7 @@ export async function sha256Hex(text) {
   return toHex(await crypto.subtle.digest('SHA-256', enc.encode(text)));
 }
 
-function randomHex(bytes) {
+export function randomHex(bytes) {
   return toHex(crypto.getRandomValues(new Uint8Array(bytes)));
 }
 
@@ -144,7 +145,7 @@ export async function loadSession(req, env) {
   const row = await globalDb(env).first(
     `SELECT s.id AS session_id, s.business_id,
             u.id AS user_id, u.email, u.name,
-            m.role, b.name AS business_name, b.slug AS business_slug, b.logo_key AS business_logo_key, b.status AS business_status, b.timezone, b.paid_until
+            m.role, m.modulos, b.name AS business_name, b.slug AS business_slug, b.logo_key AS business_logo_key, b.status AS business_status, b.timezone, b.paid_until
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        LEFT JOIN memberships m ON m.user_id = u.id AND m.business_id = s.business_id
@@ -165,7 +166,7 @@ export async function destroySession(env, sessionId) {
 // businesses.paid_until ('YYYY-MM-DD', inclusive) lo fija Diwilo Web. NULL = sin límite.
 // Vencida -> solo lectura: toda escritura del negocio responde 402.
 
-const todayBogota = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+export const todayBogota = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
 export const isExpired = (paidUntil) => !!paidUntil && paidUntil < todayBogota();
 
 function assertWritable(c, paidUntil) {
@@ -209,7 +210,10 @@ async function authenticatePlatform(c) {
   if (!isPlatformCall(c.req)) throw new HttpError(401, 'No autorizado');
 }
 
-export async function authenticate(c, level) {
+// Las rutas de un módulo lo declaran después de dos puntos: 'tenant:pacientes', 'manager:ajustes'. Así se comprueba en cada
+// petición que el módulo esté activo para el negocio y que la persona tenga acceso (si no, 403).
+export async function authenticate(c, spec) {
+  const [level, moduleId] = String(spec).split(':');
   if (level === 'public') return;
   if (level === 'portal') return authenticatePortal(c);
   if (level === 'platform') return authenticatePlatform(c);
@@ -223,7 +227,7 @@ export async function authenticate(c, level) {
   const slug = c.req.headers.get('x-business') || (c.req.method === 'GET' && c.url?.searchParams.get('b')) || null;
   if (slug && slug !== s.business_slug) {
     const b = await globalDb(c.env).first(
-      `SELECT b.id, b.name, b.slug, b.status, b.timezone, b.paid_until, b.logo_key, m.role
+      `SELECT b.id, b.name, b.slug, b.status, b.timezone, b.paid_until, b.logo_key, m.role, m.modulos
          FROM businesses b LEFT JOIN memberships m ON m.business_id = b.id AND m.user_id = ?
         WHERE b.slug = ?`,
       s.user_id, slug,
@@ -232,7 +236,7 @@ export async function authenticate(c, level) {
     if (!b.role) throw new HttpError(403, 'No tienes acceso a este consultorio', 'NOT_MEMBER');
     Object.assign(s, {
       business_id: b.id, business_name: b.name, business_slug: b.slug, business_logo_key: b.logo_key, business_status: b.status,
-      timezone: b.timezone, paid_until: b.paid_until, role: b.role, read_only: isExpired(b.paid_until),
+      timezone: b.timezone, paid_until: b.paid_until, role: b.role, modulos: b.modulos, read_only: isExpired(b.paid_until),
     });
   }
 
@@ -242,8 +246,11 @@ export async function authenticate(c, level) {
   assertWritable(c, s.paid_until);
   c.businessId = s.business_id;
   c.role = s.role;
+  c.modulos = parseModulos(s.modulos);
+  c.readOnly = isExpired(s.paid_until);
   c.timezone = s.timezone || 'America/Bogota';
   if (level === 'manager' && !['owner', 'admin'].includes(s.role)) {
     throw new HttpError(403, 'Requiere rol de administrador del negocio');
   }
+  if (moduleId) await requireModule(c, moduleId);
 }
